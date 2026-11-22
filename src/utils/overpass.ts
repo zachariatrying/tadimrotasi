@@ -290,6 +290,15 @@ export async function fetchLiveOsmVenuesInBounds(
 
   for (const el of elements) {
     const tags = el.tags ?? {};
+    if (
+      tags['disused:amenity'] ||
+      tags['abandoned:amenity'] ||
+      tags['was:amenity'] ||
+      tags.closed === 'yes' ||
+      tags.opening_hours === 'off'
+    ) {
+      continue;
+    }
     const name = tags.name?.trim();
     const lat = el.lat ?? el.center?.lat;
     const lon = el.lon ?? el.center?.lon;

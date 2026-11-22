@@ -134,6 +134,22 @@ export default function App() {
   const [legalOpen, setLegalOpen] = useState(false);
   const [cloudUser, setCloudUser] = useState<User | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [hiddenVenueIds, setHiddenVenueIds] = useState<string[]>(() => {
+    try {
+      const raw = localStorage.getItem('tadim_hidden_venues_v1');
+      return raw ? (JSON.parse(raw) as string[]) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('tadim_hidden_venues_v1', JSON.stringify(hiddenVenueIds));
+    } catch {
+      // Ignore storage quota errors
+    }
+  }, [hiddenVenueIds]);
   const [copiedShare, setCopiedShare] = useState(false);
   const [loadingLiveOsm, setLoadingLiveOsm] = useState(false);
   const [liveOsmMsg, setLiveOsmMsg] = useState<string | null>(null);
@@ -220,9 +236,11 @@ export default function App() {
   const venueMap = useMemo(() => new Map(state.venues.map((v) => [v.id, v])), [state.venues]);
   const rankMap = useMemo(() => new Map(state.ranked.map((r) => [r.venueId, r])), [state.ranked]);
   const wantSet = useMemo(() => new Set(state.wantToGoIds), [state.wantToGoIds]);
+  const hiddenSet = useMemo(() => new Set(hiddenVenueIds), [hiddenVenueIds]);
 
   const matchesFilters = useCallback(
     (v: Venue) => {
+      if (hiddenSet.has(v.id)) return false;
       const cityOk = activeCity === 'Tüm Türkiye' || v.city === activeCity;
       const catOk = activeCategory === 'Tümü' || v.category === activeCategory;
       const quickOk =
@@ -599,6 +617,17 @@ export default function App() {
     [isAdmin]
   );
 
+  const handleHideClosedVenue = useCallback(
+    (venueId: string) => {
+      setHiddenVenueIds((prev) => (prev.includes(venueId) ? prev : [...prev, venueId]));
+      setSelectedVenueId(null);
+      if (isAdmin) {
+        void adminDeleteVenueInCloud(venueId).catch(() => {});
+      }
+    },
+    [isAdmin]
+  );
+
   const handleExportJson = () => {
     const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -823,6 +852,7 @@ export default function App() {
               onUpdateVenue={handleUpdateVenueDetails}
               isAdmin={isAdmin}
               onAdminDeleteVenue={handleAdminDeleteVenue}
+              onMarkClosed={handleHideClosedVenue}
             />
           ) : (
             <>

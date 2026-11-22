@@ -53,6 +53,7 @@ interface VenueDetailDrawerProps {
   onUpdateVenue?: (venueId: string, patch: Partial<Venue>) => void;
   isAdmin?: boolean;
   onAdminDeleteVenue?: (venueId: string) => void;
+  onMarkClosed?: (venueId: string) => void;
 }
 
 export function VenueDetailDrawer({
@@ -70,6 +71,7 @@ export function VenueDetailDrawer({
   onUpdateVenue,
   isAdmin,
   onAdminDeleteVenue,
+  onMarkClosed,
 }: VenueDetailDrawerProps) {
   const toGooglePhotos = (v: Venue): VenuePhoto[] =>
     (v.googlePhotos ?? []).map((url, idx) => ({
@@ -475,6 +477,15 @@ export function VenueDetailDrawer({
                   >
                     <Pencil className="w-2.5 h-2.5" />
                     Konum / İsim Düzelt
+                  </button>
+                )}
+                {onMarkClosed && (
+                  <button
+                    type="button"
+                    onClick={() => onMarkClosed(venue.id)}
+                    className="inline-flex items-center gap-1 rounded border border-[#FECACA] bg-[#FEF2F2] px-1.5 py-0.5 text-[10px] font-semibold text-[#B91C1C] hover:bg-[#FEE2E2] cursor-pointer"
+                  >
+                    Kapandı / Kaldır
                   </button>
                 )}
               </div>

@@ -43721,23 +43721,6 @@
     "signatureDish": "Hızlı sokak lezzetleri, sıcak dürüm ve atıştırmalıklar"
   },
   {
-    "id": "tr-osm-n5306536722",
-    "name": "Kapalıyol Pilavcısı",
-    "city": "Antalya",
-    "district": "Kaleiçi & Muratpaşa",
-    "category": "3. Nesil Kahve",
-    "priceTier": "₺₺",
-    "lat": 36.88958,
-    "lng": 30.70401,
-    "gpsVerified": true,
-    "address": "Kaleiçi & Muratpaşa, Antalya",
-    "openingHours": "09:00–23:00",
-    "outdoorSeating": true,
-    "googleRating": 4.1,
-    "googleReviewCount": 1867,
-    "signatureDish": "Nitelikli espresso, filtre kahve ve taze fırın ürünleri"
-  },
-  {
     "id": "tr-osm-n5308581027",
     "name": "Cigerci Sıddık Usta'nın Yeri",
     "city": "Antalya",

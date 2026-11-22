@@ -647,6 +647,35 @@ export default function App() {
     });
   }, []);
 
+  const handleQuickCreateAndRate = useCallback(
+    (rawName: string) => {
+      const name = rawName.trim();
+      if (name.length < 2) return;
+      const city = activeCity === 'Tüm Türkiye' ? 'İstanbul' : activeCity;
+      const center = CITY_CENTERS[city] ?? { lat: 41.0082, lng: 28.9784 };
+      const newVenue: Venue = {
+        id: `v-user-${Date.now()}`,
+        name,
+        city,
+        district: city,
+        category: activeCategory === 'Tümü' ? 'Esnaf Lokantası' : activeCategory,
+        priceTier: '₺₺',
+        lat: center.lat,
+        lng: center.lng,
+        gpsVerified: false,
+        signatureDish: `${city} · Kullanıcı kaydı`,
+        sourcePlatform: 'Manuel',
+      };
+      setState((prev) => ({
+        ...prev,
+        venues: [newVenue, ...prev.venues],
+      }));
+      setSelectedVenueId(newVenue.id);
+      setRankingVenue(newVenue);
+    },
+    [activeCity, activeCategory]
+  );
+
   const handleExportJson = () => {
     const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -945,7 +974,22 @@ export default function App() {
                       )}
                     </div>
                   ) : (
-                    visibleVenues.slice(0, 200).map((venue) => {
+                    <>
+                    {searchTerm.trim().length >= 2 && (
+                      <div className="px-3.5 py-2 bg-[#F0FDFA] border-b border-[#CCFBF1] flex items-center justify-between gap-2">
+                        <span className="text-[11px] text-[#134E4A] truncate">
+                          Aradığın <strong>“{searchTerm.trim()}”</strong> listede yok mu?
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleQuickCreateAndRate(searchTerm)}
+                          className="shrink-0 rounded-md bg-[#0B4A4F] px-2.5 py-1 text-[11px] font-bold text-white hover:bg-[#083A3E] cursor-pointer"
+                        >
+                          + Hemen Ekle &amp; Puanla
+                        </button>
+                      </div>
+                    )}
+                    {visibleVenues.slice(0, 200).map((venue) => {
                       const rank = rankMap.get(venue.id);
                       const isWant = wantSet.has(venue.id);
 
@@ -1018,7 +1062,8 @@ export default function App() {
                           </div>
                         </div>
                       );
-                    })
+                    })}
+                    </>
                   ))}
 
                 {activeTab === 'ranked' &&

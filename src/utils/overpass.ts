@@ -235,9 +235,9 @@ export async function fetchLiveOsmVenuesInBounds(
     return [];
   }
 
-  const limit = options?.limit ?? 220;
+  const limit = options?.limit ?? 400;
   const bbox = `${qBounds.south.toFixed(5)},${qBounds.west.toFixed(5)},${qBounds.north.toFixed(5)},${qBounds.east.toFixed(5)}`;
-  const query = `[out:json][timeout:12];(nwr["amenity"~"^(restaurant|cafe|fast_food|bakery|ice_cream|pub|bar|food_court)$"]["name"](${bbox});nwr["shop"~"^(pastry|bakery|confectionery|coffee)$"]["name"](${bbox}););out center ${limit};`;
+  const query = `[out:json][timeout:12];(nwr["amenity"~"^(restaurant|cafe|fast_food|bakery|ice_cream|pub|bar|food_court|teahouse|biergarten)$"]["name"](${bbox});nwr["shop"~"^(pastry|bakery|confectionery|coffee|deli|chocolate|tea|ice_cream|nuts|spices)$"]["name"](${bbox}););out center ${limit};`;
 
   interface OverpassElement {
     id: number;

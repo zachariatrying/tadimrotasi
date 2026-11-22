@@ -12,6 +12,7 @@
     "cap:ios": "npx cap add ios && npx cap sync ios"
   },
   "dependencies": {
+    "@capacitor/android": "^7.2.0",
     "@capacitor/core": "^7.2.0",
     "@supabase/supabase-js": "^2.49.4",
     "leaflet": "^1.9.4",

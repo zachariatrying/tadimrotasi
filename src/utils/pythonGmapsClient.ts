@@ -30,7 +30,7 @@ export interface PythonGmapsInspection {
   embed_streetview_url: string;
 }
 
-const PY_BACKEND = 'http://127.0.0.1:8005';
+const PY_BACKEND: string = import.meta.env.VITE_PY_BACKEND || 'http://127.0.0.1:8005';
 const KEY_STORAGE = 'tr_google_maps_api_key';
 
 export function getSavedGoogleMapsKey(): string {

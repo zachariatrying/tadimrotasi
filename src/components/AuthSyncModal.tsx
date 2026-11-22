@@ -53,7 +53,13 @@ export function AuthSyncModal({
       );
       setStatusMsg(`@${profileHandle.trim().replace(/^@/, '').toLowerCase()} profilin kaydedildi — artık Çevre aramasında görünürsün.`);
     } catch (err) {
-      setStatusMsg(err instanceof Error ? err.message : 'Profil kaydedilemedi.');
+      const msg =
+        err instanceof Error
+          ? err.message
+          : typeof err === 'object' && err !== null && 'message' in err
+            ? String((err as { message: unknown }).message)
+            : 'Profil kaydedilemedi.';
+      setStatusMsg(msg);
     } finally {
       setBusy(false);
     }

@@ -703,7 +703,7 @@ export default function App() {
       {/* Committed Deep Bosphorus Teal Top Bar */}
       <header className="h-14 shrink-0 bg-[#0B4A4F] text-white px-3 sm:px-4 flex items-center justify-between gap-3 border-b border-[#08393D]">
         <div className="flex items-center gap-2.5 shrink-0">
-          <img src="/favicon.svg" alt="" className="w-7 h-7 rounded-md" />
+          <img src={`${import.meta.env.BASE_URL}store-assets/tadimrotasi_icon.png`} alt="TadımRotası" className="w-7 h-7 rounded-md object-cover" />
           <span className="text-base font-extrabold tracking-tight">TadımRotası</span>
           <span className="hidden xl:inline-block rounded bg-white/12 px-2 py-0.5 text-[11px] font-bold text-[#D1ECEA] tabular-nums">
             {state.venues.length.toLocaleString('tr-TR')} mekân

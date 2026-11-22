@@ -23,8 +23,6 @@ import {
   Map as MapIcon,
   Satellite,
   Mountain,
-  Volume2,
-  BookOpen,
   Pencil,
   AlertTriangle,
 } from 'lucide-react';
@@ -103,13 +101,6 @@ export function VenueDetailDrawer({
     lat?: number;
     lng?: number;
   } | null>(null);
-  const [culinaryDict, setCulinaryDict] = useState<{
-    word: string;
-    phonetic?: string;
-    audio?: string;
-    definition: string;
-    origin?: string;
-  } | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -132,61 +123,6 @@ export function VenueDetailDrawer({
     void fetchTerraceWeather(venue.lat, venue.lng).then((w) => {
       if (active) setTerraceWeather(w);
     });
-
-    // Lookup international culinary term via Free Dictionary API v2 (api.dictionaryapi.dev)
-    const textLower = `${venue.name} ${venue.signatureDish} ${venue.category}`.toLocaleLowerCase('tr-TR');
-    const termMap: Array<[string, string]> = [
-      ['baklava', 'baklava'],
-      ['kebap', 'kebab'],
-      ['döner', 'kebab'],
-      ['ocakbaşı', 'kebab'],
-      ['köfte', 'kofta'],
-      ['kahve', 'espresso'],
-      ['coffee', 'espresso'],
-      ['kruvasan', 'croissant'],
-      ['profiterol', 'profiterole'],
-      ['waffle', 'waffle'],
-      ['bistro', 'bistro'],
-      ['meyhane', 'meze'],
-      ['meze', 'meze'],
-      ['helva', 'halva'],
-      ['pide', 'pita'],
-      ['lahmacun', 'pita'],
-      ['yoğurt', 'yogurt'],
-      ['dondurma', 'sorbet'],
-    ];
-    const matchedTerm = termMap.find(([trKey]) => textLower.includes(trKey))?.[1] || 'cuisine';
-    setCulinaryDict(null);
-    void fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(matchedTerm)}`)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((arr) => {
-        if (!active || !Array.isArray(arr) || !arr[0]) return;
-        const entry = arr[0] as {
-          word?: string;
-          phonetic?: string;
-          origin?: string;
-          phonetics?: Array<{ text?: string; audio?: string }>;
-          meanings?: Array<{ definitions?: Array<{ definition?: string }> }>;
-        };
-        const def = entry.meanings?.[0]?.definitions?.[0]?.definition;
-        if (!def) return;
-        const rawAudio = entry.phonetics?.find((p) => p.audio && p.audio.length > 4)?.audio;
-        const audio = rawAudio
-          ? rawAudio.startsWith('//')
-            ? `https:${rawAudio}`
-            : rawAudio
-          : undefined;
-        setCulinaryDict({
-          word: entry.word || matchedTerm,
-          phonetic: entry.phonetic || entry.phonetics?.find((p) => p.text)?.text,
-          audio,
-          definition: def,
-          origin: entry.origin,
-        });
-      })
-      .catch(() => {
-        // Ignore dictionary offline errors
-      });
 
     void inspectVenueViaPythonGmaps(venue).then((info) => {
       if (!active) return;
@@ -878,7 +814,7 @@ export function VenueDetailDrawer({
               <div className="mt-2.5 rounded-lg border border-[#CCFBF1] bg-[#F0FDFA] p-2.5 space-y-1.5">
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-[10px] font-extrabold uppercase tracking-wider text-[#0B4A4F]">
-                    Google AI Mode (udm=50) Özeti & Atıflar
+                    Google Yorumlarının Özeti
                   </span>
                   <a
                     href={pyGmaps.ai_mode.url}
@@ -886,28 +822,35 @@ export function VenueDetailDrawer({
                     rel="noreferrer"
                     className="inline-flex items-center gap-1 text-[10px] font-bold text-[#0F766E] hover:underline"
                   >
-                    AI Mode’da Aç
+                    Google’da Gör
                     <ExternalLink className="w-2.5 h-2.5" />
                   </a>
                 </div>
                 <p className="text-[11px] text-[#134E4A] leading-relaxed">
                   {pyGmaps.ai_mode.response_text}
                 </p>
-                {pyGmaps.ai_mode.links && pyGmaps.ai_mode.links.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5 pt-0.5">
-                    {pyGmaps.ai_mode.links.map((lk) => (
-                      <a
-                        key={lk.url}
-                        href={lk.url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex items-center gap-1 rounded bg-white border border-[#99F6E4] px-2 py-0.5 text-[10px] font-semibold text-[#0B4A4F] hover:bg-[#CCFBF1]"
-                      >
-                        {lk.text}
-                      </a>
-                    ))}
-                  </div>
-                )}
+                {pyGmaps.ai_mode.links &&
+                  pyGmaps.ai_mode.links.filter(
+                    (lk) => !lk.text.includes('udm=50') && !lk.text.includes('AI Mode')
+                  ).length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 pt-0.5">
+                      {pyGmaps.ai_mode.links
+                        .filter(
+                          (lk) => !lk.text.includes('udm=50') && !lk.text.includes('AI Mode')
+                        )
+                        .map((lk) => (
+                          <a
+                            key={lk.url}
+                            href={lk.url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1 rounded bg-white border border-[#99F6E4] px-2 py-0.5 text-[10px] font-semibold text-[#0B4A4F] hover:bg-[#CCFBF1]"
+                          >
+                            {lk.text}
+                          </a>
+                        ))}
+                    </div>
+                  )}
               </div>
             )}
             {venue.cuisineTags && venue.cuisineTags.length > 0 && (
@@ -920,36 +863,6 @@ export function VenueDetailDrawer({
                     {tag}
                   </span>
                 ))}
-              </div>
-            )}
-
-            {culinaryDict && (
-              <div className="mt-2.5 rounded-lg border border-[#E2E8F0] bg-[#F8FAFC] p-2.5 space-y-1">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="inline-flex items-center gap-1.5 text-[11px] font-extrabold text-[#1E293B]">
-                    <BookOpen className="w-3.5 h-3.5 text-[#0B4A4F]" />
-                    <span>Gastronomi Sözlüğü: “{culinaryDict.word}”</span>
-                    {culinaryDict.phonetic && (
-                      <span className="font-normal text-[#64748B]">{culinaryDict.phonetic}</span>
-                    )}
-                  </div>
-                  {culinaryDict.audio && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        void new Audio(culinaryDict.audio).play();
-                      }}
-                      className="inline-flex items-center gap-1 rounded bg-[#0B4A4F] px-2 py-0.5 text-[10px] font-bold text-white hover:bg-[#08393D] cursor-pointer"
-                    >
-                      <Volume2 className="w-3 h-3" />
-                      Dinle
-                    </button>
-                  )}
-                </div>
-                <p className="text-[11px] text-[#475569] leading-snug">{culinaryDict.definition}</p>
-                {culinaryDict.origin && (
-                  <p className="text-[10px] text-[#64748B] italic">Köken: {culinaryDict.origin}</p>
-                )}
               </div>
             )}
           </div>

@@ -19,6 +19,8 @@ jobs:
       - run: npm run build
         env:
           VITE_PY_BACKEND: ${{ vars.VITE_PY_BACKEND }}
+          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
       - run: npx cap sync android
       - name: Decode Release Keystore (if configured)
         env:

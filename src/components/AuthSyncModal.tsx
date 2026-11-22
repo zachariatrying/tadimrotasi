@@ -7,6 +7,7 @@ import {
   isSupabaseConfigured,
   pullStateFromCloud,
   pushStateToCloud,
+  upsertMyProfile,
 } from '../lib/supabase';
 
 interface AuthSyncModalProps {
@@ -31,6 +32,29 @@ export function AuthSyncModal({
   const [mode, setMode] = useState<'login' | 'signup'>('login');
   const [busy, setBusy] = useState(false);
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
+  const [profileHandle, setProfileHandle] = useState('');
+  const [profileName, setProfileName] = useState('');
+  const [profileCity, setProfileCity] = useState('İstanbul');
+
+  const handleSaveProfile = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!user || !profileHandle.trim()) return;
+    setBusy(true);
+    setStatusMsg(null);
+    try {
+      await upsertMyProfile(
+        user.id,
+        profileHandle,
+        profileName || profileHandle,
+        profileCity
+      );
+      setStatusMsg(`@${profileHandle.trim().replace(/^@/, '').toLowerCase()} profilin kaydedildi — artık Çevre aramasında görünürsün.`);
+    } catch (err) {
+      setStatusMsg(err instanceof Error ? err.message : 'Profil kaydedilemedi.');
+    } finally {
+      setBusy(false);
+    }
+  };
 
   if (!open) return null;
 
@@ -161,6 +185,43 @@ export function AuthSyncModal({
                 </div>
                 <div className="text-[#111827] mt-1 font-semibold">{user.email}</div>
               </div>
+
+              <form onSubmit={handleSaveProfile} className="rounded-lg border border-[#E2E8F0] bg-[#F8FAFB] p-3 space-y-2">
+                <div className="text-[11px] font-bold text-[#0B4A4F]">Herkese Açık @kullaniciadi Profili</div>
+                <div className="grid grid-cols-2 gap-1.5">
+                  <input
+                    type="text"
+                    required
+                    value={profileHandle}
+                    onChange={(e) => setProfileHandle(e.target.value)}
+                    placeholder="@kullaniciadi"
+                    className="rounded border border-[#D8E0E4] bg-white px-2.5 py-1.5 text-xs"
+                  />
+                  <input
+                    type="text"
+                    value={profileName}
+                    onChange={(e) => setProfileName(e.target.value)}
+                    placeholder="Ad Soyad"
+                    className="rounded border border-[#D8E0E4] bg-white px-2.5 py-1.5 text-xs"
+                  />
+                </div>
+                <div className="flex gap-1.5">
+                  <input
+                    type="text"
+                    value={profileCity}
+                    onChange={(e) => setProfileCity(e.target.value)}
+                    placeholder="Şehir (örn. İstanbul)"
+                    className="flex-1 rounded border border-[#D8E0E4] bg-white px-2.5 py-1.5 text-xs"
+                  />
+                  <button
+                    type="submit"
+                    disabled={busy || !profileHandle.trim()}
+                    className="rounded bg-[#0B4A4F] px-3 py-1.5 text-xs font-bold text-white disabled:opacity-50 cursor-pointer"
+                  >
+                    Profili Kaydet
+                  </button>
+                </div>
+              </form>
 
               <div className="grid grid-cols-2 gap-2.5">
                 <button

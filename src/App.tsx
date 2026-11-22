@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Plus,
   Bookmark,
@@ -43,7 +43,6 @@ import { buildShareableListUrl, parseSharedListInput, readSharedListFromHash } f
 import { downloadTopTenStoryPng } from './utils/storyCard';
 import { fetchLiveOsmVenuesInBounds, type MapBoundsBox } from './utils/overpass';
 import { searchLiveTurkeyRestaurants } from './utils/geocoder';
-import { getInstantVenuePhotos } from './utils/venuePhotos';
 import { fetchQuickGoogleMapsThumb, getCachedVenueThumb } from './utils/pythonGmapsClient';
 import { calculateInAppRoute, type ActiveRouteData } from './utils/routingAndGeo';
 import {
@@ -89,54 +88,29 @@ function loadState(): TadimState {
 
 type RailTab = 'discover' | 'ranked' | 'want' | 'friends';
 
-function VenueThumb({ venue, size = 'md' }: { venue: Venue; size?: 'md' | 'sm' }) {
-  const imgRef = useRef<HTMLImageElement | null>(null);
-  const [url, setUrl] = useState<string>(() => {
-    return getCachedVenueThumb(venue) || getInstantVenuePhotos(venue)[0]?.url || '';
-  });
+function VenueThumb({ venue, size = 'md', liveThumb }: { venue: Venue; size?: 'md' | 'sm'; liveThumb?: string }) {
+  const realUrl = venue.googlePhotos?.[0] || liveThumb || getCachedVenueThumb(venue) || '';
+  const sizeCls = size === 'sm' ? 'w-10 h-10' : 'w-12 h-12';
 
-  useEffect(() => {
-    const cached = getCachedVenueThumb(venue);
-    if (cached) {
-      setUrl(cached);
-      return;
-    }
-    setUrl(getInstantVenuePhotos(venue)[0]?.url || '');
-
-    const el = imgRef.current;
-    if (!el || typeof IntersectionObserver === 'undefined') return;
-
-    let alive = true;
-    const io = new IntersectionObserver(
-      (entries) => {
-        if (entries[0]?.isIntersecting) {
-          io.disconnect();
-          void fetchQuickGoogleMapsThumb(venue).then((liveUrl) => {
-            if (alive && liveUrl) setUrl(liveUrl);
-          });
-        }
-      },
-      { rootMargin: '80px' }
+  if (!realUrl) {
+    return (
+      <div
+        className={`${sizeCls} rounded-lg shrink-0 bg-[#EEF3F4] border border-[#DCE5E7] flex flex-col items-center justify-center text-[#0B4A4F] select-none`}
+        title={venue.category}
+      >
+        <span className="text-xs font-extrabold leading-none">
+          {venue.category.slice(0, 2).toLocaleUpperCase('tr-TR')}
+        </span>
+      </div>
     );
-    io.observe(el);
-
-    return () => {
-      alive = false;
-      io.disconnect();
-    };
-  }, [venue]);
-
-  if (!url) return null;
+  }
   return (
     <img
-      ref={imgRef}
-      src={url}
-      alt=""
+      src={realUrl}
+      alt={venue.name}
       loading="lazy"
       referrerPolicy="no-referrer"
-      className={`${
-        size === 'sm' ? 'w-10 h-10' : 'w-12 h-12'
-      } rounded-lg object-cover shrink-0 bg-[#E5ECEC]`}
+      className={`${sizeCls} rounded-lg object-cover shrink-0 bg-[#E5ECEC]`}
     />
   );
 }
@@ -161,6 +135,7 @@ export default function App() {
   const [liveOsmMsg, setLiveOsmMsg] = useState<string | null>(null);
   const [activeRoute, setActiveRoute] = useState<ActiveRouteData | null>(null);
   const [routingBusy, setRoutingBusy] = useState(false);
+  const [liveThumbs, setLiveThumbs] = useState<Record<string, string>>({});
   const [sharedImport, setSharedImport] = useState<SharedListPayload | null>(() =>
     readSharedListFromHash()
   );
@@ -262,6 +237,37 @@ export default function App() {
     () => state.venues.filter(matchesFilters),
     [state.venues, matchesFilters]
   );
+
+  // Staggered background thumbnail prefetcher (2 concurrent, 350ms pause)
+  useEffect(() => {
+    const queue = visibleVenues
+      .slice(0, 20)
+      .filter((v) => !v.googlePhotos?.[0] && !liveThumbs[v.id] && !getCachedVenueThumb(v));
+    if (queue.length === 0) return;
+
+    let cancelled = false;
+    let idx = 0;
+
+    const runWorker = async () => {
+      while (!cancelled) {
+        const nextIdx = idx++;
+        if (nextIdx >= queue.length) break;
+        const v = queue[nextIdx];
+        const thumbUrl = await fetchQuickGoogleMapsThumb(v);
+        if (!cancelled && thumbUrl) {
+          setLiveThumbs((prev) => (prev[v.id] === thumbUrl ? prev : { ...prev, [v.id]: thumbUrl }));
+        }
+        await new Promise((r) => setTimeout(r, 350));
+      }
+    };
+
+    void runWorker();
+    void runWorker();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [visibleVenues, liveThumbs]);
 
   const filteredRanked = useMemo(() => {
     return [...state.ranked]
@@ -551,6 +557,13 @@ export default function App() {
     setCustomFriends((prev) => prev.filter((f) => f.id !== friendId));
   };
 
+  const handleUpdateVenueDetails = useCallback((venueId: string, patch: Partial<Venue>) => {
+    setState((prev) => ({
+      ...prev,
+      venues: prev.venues.map((v) => (v.id === venueId ? { ...v, ...patch } : v)),
+    }));
+  }, []);
+
   const handleExportJson = () => {
     const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -772,6 +785,7 @@ export default function App() {
               onToggleWant={handleToggleWant}
               onStartRoute={(v, mode) => void handleStartRoute(v, mode)}
               onClearRoute={() => setActiveRoute(null)}
+              onUpdateVenue={handleUpdateVenueDetails}
             />
           ) : (
             <>
@@ -859,7 +873,7 @@ export default function App() {
                             onClick={() => setSelectedVenueId(venue.id)}
                             className="flex items-center gap-3 flex-1 min-w-0 text-left cursor-pointer"
                           >
-                            <VenueThumb venue={venue} size="md" />
+                            <VenueThumb venue={venue} size="md" liveThumb={liveThumbs[venue.id]} />
                             <div className="min-w-0 flex-1">
                               <div className="flex items-center gap-1.5">
                                 <span className="text-sm font-bold text-[#111827] truncate">
@@ -943,7 +957,7 @@ export default function App() {
                             <span className="text-xs font-extrabold tabular-nums text-[#6B7280] w-5 shrink-0">
                               #{idx + 1}
                             </span>
-                            <VenueThumb venue={venue} size="sm" />
+                            <VenueThumb venue={venue} size="sm" liveThumb={liveThumbs[venue.id]} />
                             <div className="min-w-0 flex-1">
                               <div className="text-sm font-bold text-[#111827] truncate">{venue.name}</div>
                               <div className="text-xs text-[#6B7280] truncate">
@@ -998,7 +1012,7 @@ export default function App() {
                             onClick={() => setSelectedVenueId(venue.id)}
                             className="flex items-center gap-2.5 flex-1 min-w-0 text-left cursor-pointer"
                           >
-                            <VenueThumb venue={venue} size="sm" />
+                            <VenueThumb venue={venue} size="sm" liveThumb={liveThumbs[venue.id]} />
                             <div className="min-w-0 flex-1">
                               <div className="flex items-center gap-1.5">
                                 <span className="text-sm font-bold text-[#111827] truncate">{venue.name}</span>

@@ -25,6 +25,8 @@ import {
   Mountain,
   Volume2,
   BookOpen,
+  Pencil,
+  AlertTriangle,
 } from 'lucide-react';
 import type { FriendProfile, GoogleVisualReview, RankedVenue, Venue, VenuePhoto } from '../types';
 import { scoreColor } from '../utils/elo';
@@ -48,6 +50,7 @@ interface VenueDetailDrawerProps {
   onToggleWant: (venueId: string) => void;
   onStartRoute: (venue: Venue, mode: 'driving' | 'walking') => void;
   onClearRoute: () => void;
+  onUpdateVenue?: (venueId: string, patch: Partial<Venue>) => void;
 }
 
 export function VenueDetailDrawer({
@@ -62,6 +65,7 @@ export function VenueDetailDrawer({
   onToggleWant,
   onStartRoute,
   onClearRoute,
+  onUpdateVenue,
 }: VenueDetailDrawerProps) {
   const [photos, setPhotos] = useState<VenuePhoto[]>(() => getInstantVenuePhotos(venue));
   const [reviews, setReviews] = useState<GoogleVisualReview[]>(() => venue.googleReviews ?? []);
@@ -75,6 +79,16 @@ export function VenueDetailDrawer({
   const [terraceWeather, setTerraceWeather] = useState<TerraceWeatherInfo | null>(null);
   const [heroTab, setHeroTab] = useState<'photos' | 'gmap' | 'sat'>('photos');
   const [pyGmaps, setPyGmaps] = useState<PythonGmapsInspection | null>(null);
+  const [editingDetails, setEditingDetails] = useState(false);
+  const [editName, setEditName] = useState(venue.name);
+  const [editDistrict, setEditDistrict] = useState(venue.district);
+  const [editLat, setEditLat] = useState(String(venue.lat));
+  const [editLng, setEditLng] = useState(String(venue.lng));
+  const [mismatchHint, setMismatchHint] = useState<{
+    name?: string;
+    lat?: number;
+    lng?: number;
+  } | null>(null);
   const [culinaryDict, setCulinaryDict] = useState<{
     word: string;
     phonetic?: string;
@@ -93,6 +107,12 @@ export function VenueDetailDrawer({
     setLoadingPhotos(true);
     setLightboxIdx(null);
     setTerraceWeather(null);
+    setEditingDetails(false);
+    setEditName(venue.name);
+    setEditDistrict(venue.district);
+    setEditLat(String(venue.lat));
+    setEditLng(String(venue.lng));
+    setMismatchHint(null);
     setPyGmaps(null);
 
     void fetchTerraceWeather(venue.lat, venue.lng).then((w) => {
@@ -165,6 +185,9 @@ export function VenueDetailDrawer({
         setReviews((prev) => (prev.length >= info.live_reviews!.length ? prev : info.live_reviews!));
       }
       if (info.live_photos && info.live_photos.length > 0) {
+        if (!venue.googlePhotos?.length && onUpdateVenue) {
+          onUpdateVenue(venue.id, { googlePhotos: info.live_photos });
+        }
         const livePhotoObjs: VenuePhoto[] = info.live_photos.map((url, idx) => ({
           url,
           caption: `${venue.name} · Google Haritalar Görselli Yorum #${idx + 1}`,
@@ -183,6 +206,30 @@ export function VenueDetailDrawer({
         });
       }
       setLoadingPhotos(false);
+
+      const latOk =
+        typeof info.live_lat === 'number' &&
+        info.live_lat >= 35.5 &&
+        info.live_lat <= 42.5 &&
+        typeof info.live_lng === 'number' &&
+        info.live_lng >= 25.5 &&
+        info.live_lng <= 45.0;
+      const coordDiff =
+        latOk &&
+        (Math.abs((info.live_lat ?? venue.lat) - venue.lat) > 0.0008 ||
+          Math.abs((info.live_lng ?? venue.lng) - venue.lng) > 0.0008);
+      const suggestedName = info.google_place?.name?.trim();
+      const nameDiff =
+        Boolean(suggestedName) &&
+        suggestedName!.toLocaleLowerCase('tr-TR') !== venue.name.toLocaleLowerCase('tr-TR');
+
+      if (coordDiff || nameDiff) {
+        setMismatchHint({
+          name: nameDiff ? suggestedName : undefined,
+          lat: coordDiff ? (info.live_lat ?? undefined) : undefined,
+          lng: coordDiff ? (info.live_lng ?? undefined) : undefined,
+        });
+      }
     });
 
     void resolveLiveVenueEnrichment(venue).then((enriched) => {
@@ -392,6 +439,16 @@ export function VenueDetailDrawer({
                     </span>
                   </>
                 )}
+                {onUpdateVenue && (
+                  <button
+                    type="button"
+                    onClick={() => setEditingDetails((e) => !e)}
+                    className="ml-1 inline-flex items-center gap-1 rounded border border-[#D1D5DB] bg-white px-1.5 py-0.5 text-[10px] font-semibold text-[#374151] hover:border-[#0B4A4F] cursor-pointer"
+                  >
+                    <Pencil className="w-2.5 h-2.5" />
+                    Konum / İsim Düzelt
+                  </button>
+                )}
               </div>
             </div>
 
@@ -407,6 +464,104 @@ export function VenueDetailDrawer({
               </div>
             )}
           </div>
+
+          {mismatchHint && onUpdateVenue && (
+            <div className="mt-2.5 rounded-lg border border-[#FDE68A] bg-[#FFFBEB] px-3 py-2 flex items-center justify-between gap-2">
+              <div className="text-[11px] text-[#92400E] min-w-0">
+                <div className="font-bold flex items-center gap-1">
+                  <AlertTriangle className="w-3.5 h-3.5 text-[#D97706] shrink-0" /> Doğrulama Önerisi
+                </div>
+                <div className="truncate">
+                  {mismatchHint.name ? `Google adı: ${mismatchHint.name} ` : ''}
+                  {mismatchHint.lat ? `· Yeni konum: ${mismatchHint.lat.toFixed(4)}, ${mismatchHint.lng?.toFixed(4)}` : ''}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  onUpdateVenue(venue.id, {
+                    ...(mismatchHint.name ? { name: mismatchHint.name } : {}),
+                    ...(mismatchHint.lat && mismatchHint.lng
+                      ? { lat: mismatchHint.lat, lng: mismatchHint.lng, gpsVerified: true }
+                      : {}),
+                  });
+                  setMismatchHint(null);
+                }}
+                className="shrink-0 rounded-md bg-[#0B4A4F] px-2.5 py-1 text-[11px] font-bold text-white cursor-pointer"
+              >
+                Konum &amp; İsmi Güncelle
+              </button>
+            </div>
+          )}
+
+          {editingDetails && onUpdateVenue && (
+            <div className="mt-2.5 rounded-lg border border-[#D1D5DB] bg-[#F9FAFB] p-2.5 space-y-2">
+              <div className="grid grid-cols-2 gap-1.5">
+                <input
+                  type="text"
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  placeholder="Mekân adı"
+                  className="rounded border border-[#D1D5DB] bg-white px-2 py-1 text-xs"
+                />
+                <input
+                  type="text"
+                  value={editDistrict}
+                  onChange={(e) => setEditDistrict(e.target.value)}
+                  placeholder="Semt"
+                  className="rounded border border-[#D1D5DB] bg-white px-2 py-1 text-xs"
+                />
+                <input
+                  type="number"
+                  step="0.0001"
+                  value={editLat}
+                  onChange={(e) => setEditLat(e.target.value)}
+                  placeholder="Enlem (Lat)"
+                  className="rounded border border-[#D1D5DB] bg-white px-2 py-1 text-xs"
+                />
+                <input
+                  type="number"
+                  step="0.0001"
+                  value={editLng}
+                  onChange={(e) => setEditLng(e.target.value)}
+                  placeholder="Boylam (Lng)"
+                  className="rounded border border-[#D1D5DB] bg-white px-2 py-1 text-xs"
+                />
+              </div>
+              <div className="flex justify-end gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setEditingDetails(false)}
+                  className="rounded px-2.5 py-1 text-[11px] font-semibold text-[#6B7280] cursor-pointer"
+                >
+                  İptal
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const latNum = Number(editLat);
+                    const lngNum = Number(editLng);
+                    const validCoords =
+                      Number.isFinite(latNum) &&
+                      Number.isFinite(lngNum) &&
+                      latNum >= 35.5 &&
+                      latNum <= 42.5 &&
+                      lngNum >= 25.5 &&
+                      lngNum <= 45.0;
+                    onUpdateVenue(venue.id, {
+                      name: editName.trim() || venue.name,
+                      district: editDistrict.trim() || venue.district,
+                      ...(validCoords ? { lat: latNum, lng: lngNum, gpsVerified: true } : {}),
+                    });
+                    setEditingDetails(false);
+                  }}
+                  className="rounded bg-[#0B4A4F] px-3 py-1 text-[11px] font-bold text-white cursor-pointer"
+                >
+                  Kaydet
+                </button>
+              </div>
+            </div>
+          )}
 
           <div className="mt-2 flex flex-wrap items-center gap-1.5">
             {googleRating && (
@@ -436,6 +591,8 @@ export function VenueDetailDrawer({
               </div>
             )}
           </div>
+
+
 
           {/* Quick Actions (Google Maps Style) */}
           <div className="mt-3.5 grid grid-cols-2 gap-2">
@@ -746,6 +903,8 @@ export function VenueDetailDrawer({
               </div>
             )}
           </div>
+
+
 
           {liveHours && (
             <div className="px-4 py-2.5 flex items-center gap-3">

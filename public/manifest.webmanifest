@@ -1,0 +1,9 @@
+{
+  "name": "TadımRotası — Kişisel Gastronomi Sıralaman",
+  "short_name": "TadımRotası",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#FFFFFF",
+  "theme_color": "#0B4A4F",
+  "lang": "tr"
+}

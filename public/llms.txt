@@ -1,0 +1,10 @@
+# TadımRotası
+
+> Sahte 5 yıldızlı yorumları geride bırakan, Türkiye odaklı ikili karşılaştırmalı (Elo) kişisel restoran & kafe sıralama ve Reels-to-Map uygulaması.
+
+## Temel Özellikler
+- **İkili Karşılaştırmalı Sıralama (0.0–10.0):** Yeni mekânları listenizdeki mevcut mekânlarla kıyaslayarak dürüst kişisel sıralama üretir.
+- **Reels / TikTok → Gideceklerim:** Sosyal medyada keşfedilen mekânları OpenStreetMap Nominatim ile gerçek Türkiye GPS koordinatlarıyla haritaya kaydeder.
+- **Arkadaş Zevk Uyumu (% Eşleşme):** Ortak gidilen mekânlardaki puan yakınlığına göre arkadaş eşleşme skoru hesaplar.
+- **Instagram Story PNG Kartı & Paylaşılabilir Liste Linki:** En İyi 10 listenizi 1080x1350 görsel kart veya tek tıkla link olarak paylaşın.
+- **KVKK & Gizlilik Öncelikli:** Fotoğraf EXIF/GPS verisi saklanmaz, reklam/izleme yoktur, tek tıkla veri ve hesap silme desteklenir.

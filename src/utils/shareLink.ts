@@ -65,3 +65,25 @@ export function readSharedListFromHash(): SharedListPayload | null {
     return null;
   }
 }
+
+export function parseSharedListInput(input: string): SharedListPayload | null {
+  try {
+    const trimmed = input.trim();
+    if (!trimmed) return null;
+    const idx = trimmed.indexOf('#liste=');
+    const token =
+      idx >= 0
+        ? trimmed.slice(idx + '#liste='.length)
+        : trimmed.startsWith('liste=')
+          ? trimmed.slice('liste='.length)
+          : trimmed;
+    const cleanToken = token.split(/[&#\s]/)[0];
+    if (!cleanToken) return null;
+    const raw = fromBase64Url(cleanToken);
+    const parsed = JSON.parse(raw) as SharedListPayload;
+    if (!parsed || !Array.isArray(parsed.items) || parsed.items.length === 0) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}

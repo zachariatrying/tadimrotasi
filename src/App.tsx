@@ -22,6 +22,7 @@ import {
 import type { User } from '@supabase/supabase-js';
 import type {
   CityName,
+  FriendProfile,
   SentimentTier,
   SharedListPayload,
   TadimState,
@@ -38,14 +39,19 @@ import {
   VENUE_CATEGORIES,
 } from './data/venues';
 import { insertRankedVenue, recalculateScores, scoreColor } from './utils/elo';
-import { buildShareableListUrl, readSharedListFromHash } from './utils/shareLink';
+import { buildShareableListUrl, parseSharedListInput, readSharedListFromHash } from './utils/shareLink';
 import { downloadTopTenStoryPng } from './utils/storyCard';
 import { fetchLiveOsmVenuesInBounds, type MapBoundsBox } from './utils/overpass';
 import { searchLiveTurkeyRestaurants } from './utils/geocoder';
 import { getInstantVenuePhotos } from './utils/venuePhotos';
 import { fetchQuickGoogleMapsThumb, getCachedVenueThumb } from './utils/pythonGmapsClient';
 import { calculateInAppRoute, type ActiveRouteData } from './utils/routingAndGeo';
-import { deleteAllCloudUserData, getCurrentUser, isSupabaseConfigured } from './lib/supabase';
+import {
+  deleteAllCloudUserData,
+  fetchFollowingProfiles,
+  getCurrentUser,
+  isSupabaseConfigured,
+} from './lib/supabase';
 import { TurkeyMap3D } from './components/TurkeyMap3D';
 import { VenueDetailDrawer } from './components/VenueDetailDrawer';
 import { CompareModal } from './components/CompareModal';
@@ -158,6 +164,51 @@ export default function App() {
   const [sharedImport, setSharedImport] = useState<SharedListPayload | null>(() =>
     readSharedListFromHash()
   );
+  const [customFriends, setCustomFriends] = useState<FriendProfile[]>(() => {
+    try {
+      const raw = localStorage.getItem('tadim_custom_friends_v1');
+      return raw ? (JSON.parse(raw) as FriendProfile[]) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [cloudFriends, setCloudFriends] = useState<FriendProfile[]>([]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('tadim_custom_friends_v1', JSON.stringify(customFriends));
+    } catch {
+      // Ignore storage quota errors
+    }
+  }, [customFriends]);
+
+  const refreshCloudFriends = useCallback(async () => {
+    if (!cloudUser || !isSupabaseConfigured) {
+      setCloudFriends([]);
+      return;
+    }
+    try {
+      const list = await fetchFollowingProfiles(cloudUser.id);
+      setCloudFriends(list);
+    } catch {
+      // Ignore offline
+    }
+  }, [cloudUser]);
+
+  useEffect(() => {
+    void refreshCloudFriends();
+  }, [refreshCloudFriends]);
+
+  const allFriends = useMemo(() => {
+    const seen = new Set<string>();
+    const merged: FriendProfile[] = [];
+    for (const f of [...cloudFriends, ...customFriends, ...FRIENDS]) {
+      if (seen.has(f.id)) continue;
+      seen.add(f.id);
+      merged.push(f);
+    }
+    return merged;
+  }, [cloudFriends, customFriends]);
 
   // Persist only user rankings, wantToGoIds, and custom user-added venues so 3,545 seed venues don't bloat localStorage
   useEffect(() => {
@@ -428,6 +479,78 @@ export default function App() {
     setActiveTab('want');
   };
 
+  const handleAddFriendFromShare = (rawInput: string): { ok: boolean; message: string } => {
+    const parsed = parseSharedListInput(rawInput);
+    if (!parsed) {
+      return {
+        ok: false,
+        message: 'Geçerli bir TadımRotası paylaşım linki veya kodu bulunamadı.',
+      };
+    }
+
+    const byNameCity = new Map(
+      state.venues.map((v) => [`${v.name.toLocaleLowerCase('tr-TR')}|${v.city}`, v.id])
+    );
+    const newVenues: Venue[] = [];
+    const ratings: FriendProfile['ratings'] = [];
+
+    parsed.items.forEach((item, idx) => {
+      const key = `${item.name.toLocaleLowerCase('tr-TR')}|${item.city}`;
+      let vid = byNameCity.get(key);
+      if (!vid) {
+        vid = `v-friend-${Date.now()}-${idx}`;
+        byNameCity.set(key, vid);
+        newVenues.push({
+          id: vid,
+          name: item.name,
+          city: item.city,
+          district: item.district,
+          category: item.category,
+          priceTier: item.priceTier,
+          lat: item.lat,
+          lng: item.lng,
+          gpsVerified: true,
+          signatureDish: item.signatureDish,
+          sourcePlatform: 'Arkadaş',
+        });
+      }
+      ratings.push({
+        venueId: vid,
+        score: item.score,
+        note: item.signatureDish ? `İmza lezzet: ${item.signatureDish}` : 'Paylaşılan liste',
+      });
+    });
+
+    if (newVenues.length > 0) {
+      setState((prev) => ({
+        ...prev,
+        venues: [...newVenues, ...prev.venues],
+      }));
+    }
+
+    const ownerName = parsed.owner || 'Arkadaş';
+    const cleanHandle = ownerName.toLowerCase().replace(/[^a-z0-9_]+/g, '') || 'arkadas';
+    const newFriend: FriendProfile = {
+      id: `custom-${Date.now()}`,
+      name: ownerName,
+      handle: `@${cleanHandle}`,
+      city: parsed.items[0]?.city ?? 'İstanbul',
+      bio: `${parsed.createdAt} tarihli paylaşılan liste (${ratings.length} mekân)`,
+      avatarBg: '#0B4A4F',
+      ratings,
+    };
+
+    setCustomFriends((prev) => [newFriend, ...prev]);
+    return {
+      ok: true,
+      message: `${ownerName} çevrene eklendi (${ratings.length} mekân). Uyum puanı otomatik hesaplandı.`,
+    };
+  };
+
+  const handleRemoveCustomFriend = (friendId: string) => {
+    setCustomFriends((prev) => prev.filter((f) => f.id !== friendId));
+  };
+
   const handleExportJson = () => {
     const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -641,7 +764,7 @@ export default function App() {
               venue={selectedVenue}
               rank={rankMap.get(selectedVenue.id)}
               isWant={wantSet.has(selectedVenue.id)}
-              friends={FRIENDS}
+              friends={allFriends}
               activeRoute={activeRoute}
               routingBusy={routingBusy}
               onClose={() => setSelectedVenueId(null)}
@@ -679,7 +802,7 @@ export default function App() {
                     { id: 'discover', label: 'Keşfet', count: visibleVenues.length, icon: Compass },
                     { id: 'ranked', label: 'Sıralamam', count: filteredRanked.length, icon: Trophy },
                     { id: 'want', label: 'Kayıtlı', count: filteredWant.length, icon: Bookmark },
-                    { id: 'friends', label: 'Çevre', count: FRIENDS.length, icon: Users },
+                    { id: 'friends', label: 'Çevre', count: allFriends.length, icon: Users },
                   ] as const
                 ).map((tab) => {
                   const Icon = tab.icon;
@@ -914,10 +1037,12 @@ export default function App() {
 
                 {activeTab === 'friends' && (
                   <FriendsTab
-                    friends={FRIENDS}
+                    friends={allFriends}
                     venues={state.venues}
                     userRanked={state.ranked}
                     wantToGoIds={state.wantToGoIds}
+                    cloudUser={cloudUser}
+                    copiedShare={copiedShare}
                     onAddWantToGo={(id) => {
                       if (!wantSet.has(id)) handleToggleWant(id);
                     }}
@@ -928,6 +1053,10 @@ export default function App() {
                         setSelectedVenueId(id);
                       }
                     }}
+                    onCopyMyInviteLink={handleCopyShareUrl}
+                    onAddFriendFromShare={handleAddFriendFromShare}
+                    onRemoveCustomFriend={handleRemoveCustomFriend}
+                    onRefreshCloudFriends={refreshCloudFriends}
                   />
                 )}
               </div>

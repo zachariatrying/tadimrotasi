@@ -1,5 +1,5 @@
 import { createClient, type SupabaseClient, type User } from '@supabase/supabase-js';
-import type { RankedVenue, SentimentTier, TadimState, Venue, VenueCategory, VenueCity } from '../types';
+import type { FriendProfile, RankedVenue, SentimentTier, TadimState, Venue, VenueCategory, VenueCity } from '../types';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
@@ -130,4 +130,110 @@ export async function deleteAllCloudUserData(): Promise<void> {
   const { error } = await sb.rpc('delete_my_data');
   if (error) throw error;
   await sb.auth.signOut();
+}
+
+export interface PublicProfileSummary {
+  id: string;
+  handle: string;
+  display_name: string;
+  home_city: string;
+  bio: string;
+}
+
+export async function upsertMyProfile(
+  userId: string,
+  handle: string,
+  displayName: string,
+  homeCity: string,
+  bio = ''
+): Promise<void> {
+  const sb = getSupabase();
+  if (!sb) throw new Error('Supabase yapılandırılmamış.');
+  const cleanHandle = handle.trim().replace(/^@/, '').toLowerCase();
+  const { error } = await sb.from('profiles').upsert({
+    id: userId,
+    handle: cleanHandle,
+    display_name: displayName.trim() || cleanHandle,
+    home_city: homeCity || 'İstanbul',
+    bio,
+    is_public: true,
+  });
+  if (error) throw error;
+}
+
+export async function searchPublicProfiles(query: string): Promise<PublicProfileSummary[]> {
+  const sb = getSupabase();
+  if (!sb) return [];
+  const q = query.trim().replace(/^@/, '');
+  if (!q) return [];
+  const { data, error } = await sb
+    .from('profiles')
+    .select('id, handle, display_name, home_city, bio')
+    .eq('is_public', true)
+    .or(`handle.ilike.%${q}%,display_name.ilike.%${q}%`)
+    .limit(10);
+  if (error) throw error;
+  return (data ?? []) as PublicProfileSummary[];
+}
+
+export async function followUser(followerId: string, followingId: string): Promise<void> {
+  const sb = getSupabase();
+  if (!sb) throw new Error('Supabase yapılandırılmamış.');
+  const { error } = await sb
+    .from('follows')
+    .upsert({ follower_id: followerId, following_id: followingId });
+  if (error) throw error;
+}
+
+export async function unfollowUser(followerId: string, followingId: string): Promise<void> {
+  const sb = getSupabase();
+  if (!sb) throw new Error('Supabase yapılandırılmamış.');
+  const { error } = await sb
+    .from('follows')
+    .delete()
+    .eq('follower_id', followerId)
+    .eq('following_id', followingId);
+  if (error) throw error;
+}
+
+const AVATAR_PALETTE = ['#0B4A4F', '#C84B31', '#6D28D9', '#047857', '#B45309'];
+
+export async function fetchFollowingProfiles(followerId: string): Promise<FriendProfile[]> {
+  const sb = getSupabase();
+  if (!sb) return [];
+
+  const { data: followRows, error: fErr } = await sb
+    .from('follows')
+    .select('following_id')
+    .eq('follower_id', followerId);
+  if (fErr || !followRows?.length) return [];
+
+  const ids = followRows.map((r) => String(r.following_id));
+  const [profRes, rankRes] = await Promise.all([
+    sb.from('profiles').select('id, handle, display_name, home_city, bio').in('id', ids),
+    sb.from('user_rankings').select('user_id, venue_id, score, personal_note').in('user_id', ids).order('score', { ascending: false }),
+  ]);
+
+  if (profRes.error || !profRes.data) return [];
+  const ranksByUser = new Map<string, Array<{ venueId: string; score: number; note: string }>>();
+  for (const r of rankRes.data ?? []) {
+    const uid = String(r.user_id);
+    const list = ranksByUser.get(uid) ?? [];
+    list.push({
+      venueId: String(r.venue_id),
+      score: Number(r.score),
+      note: String(r.personal_note || ''),
+    });
+    ranksByUser.set(uid, list);
+  }
+
+  return profRes.data.map((p, idx) => ({
+    id: String(p.id),
+    name: String(p.display_name || p.handle),
+    handle: `@${String(p.handle)}`,
+    city: (p.home_city as VenueCity) || 'İstanbul',
+    bio: String(p.bio || 'TadımRotası kullanıcısı'),
+    avatarBg: AVATAR_PALETTE[idx % AVATAR_PALETTE.length],
+    ratings: (ranksByUser.get(String(p.id)) ?? []).slice(0, 12),
+  }));
 }

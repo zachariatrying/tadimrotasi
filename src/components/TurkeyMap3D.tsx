@@ -3,7 +3,7 @@ import * as maplibregl from 'maplibre-gl';
 import type { StyleSpecification } from 'maplibre-gl';
 
 // Ensure MapLibre GL v6.19+ WebWorker always resolves with valid application/javascript MIME type in Vite
-maplibregl.setWorkerUrl('/maplibre-gl-worker.js');
+maplibregl.setWorkerUrl(`${import.meta.env.BASE_URL}maplibre-gl-worker.js`);
 import {
   Radar,
   Layers,

@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://tadimrotasi.app/sitemap.xml
+Sitemap: https://zachariatrying.github.io/tadimrotasi/sitemap.xml

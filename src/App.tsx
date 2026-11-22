@@ -118,7 +118,20 @@ function VenueThumb({ venue, size = 'md', liveThumb }: { venue: Venue; size?: 'm
 
 export default function App() {
   const [state, setState] = useState<TadimState>(() => loadState());
-  const [activeCity, setActiveCity] = useState<CityName>('İstanbul');
+  const [activeCity, setActiveCity] = useState<CityName>(() => {
+    try {
+      const param = new URLSearchParams(window.location.search).get('sehir')?.trim();
+      if (param) {
+        const match = CITY_TABS.find(
+          (c) => c.toLocaleLowerCase('tr-TR') === param.toLocaleLowerCase('tr-TR')
+        );
+        if (match) return match;
+      }
+    } catch {
+      // Ignore URL parsing errors
+    }
+    return 'İstanbul';
+  });
   const [activeCategory, setActiveCategory] = useState<VenueCategory | 'Tümü'>('Tümü');
   const [quickPick, setQuickPick] = useState<'all' | 'topRated' | 'established' | 'visualReviews'>('all');
   const [searchTerm, setSearchTerm] = useState('');
@@ -141,6 +154,28 @@ export default function App() {
       return [];
     }
   });
+
+  useEffect(() => {
+    try {
+      const sp = new URLSearchParams(window.location.search);
+      const utm_source = sp.get('utm_source');
+      const utm_campaign = sp.get('utm_campaign');
+      const utm_medium = sp.get('utm_medium');
+      if (utm_source || utm_campaign || utm_medium) {
+        localStorage.setItem(
+          'tadim_utm_attribution_v1',
+          JSON.stringify({
+            utm_source,
+            utm_campaign,
+            utm_medium,
+            landedAt: new Date().toISOString(),
+          })
+        );
+      }
+    } catch {
+      // Ignore storage errors
+    }
+  }, []);
 
   useEffect(() => {
     try {
@@ -593,7 +628,7 @@ export default function App() {
           return updatedVenue;
         });
         if (isAdmin && updatedVenue) {
-          void adminUpdateVenueInCloud(updatedVenue).catch(() => {});
+          void adminUpdateVenueInCloud(updatedVenue).catch(() => { });
         }
         return { ...prev, venues: nextVenues };
       });
@@ -611,7 +646,7 @@ export default function App() {
         wantToGoIds: prev.wantToGoIds.filter((id) => id !== venueId),
       }));
       setSelectedVenueId(null);
-      void adminDeleteVenueInCloud(venueId).catch(() => {});
+      void adminDeleteVenueInCloud(venueId).catch(() => { });
     },
     [isAdmin]
   );
@@ -621,7 +656,7 @@ export default function App() {
       setHiddenVenueIds((prev) => (prev.includes(venueId) ? prev : [...prev, venueId]));
       setSelectedVenueId(null);
       if (isAdmin) {
-        void adminDeleteVenueInCloud(venueId).catch(() => {});
+        void adminDeleteVenueInCloud(venueId).catch(() => { });
       }
     },
     [isAdmin]
@@ -822,11 +857,10 @@ export default function App() {
                 setActiveCity(city);
                 setSelectedVenueId(null);
               }}
-              className={`shrink-0 rounded-md px-2.5 py-1 text-xs font-semibold transition-colors cursor-pointer ${
-                activeCity === city
-                  ? 'bg-[#0B4A4F] text-white'
-                  : 'text-[#374151] hover:bg-[#E5ECEC]'
-              }`}
+              className={`shrink-0 rounded-md px-2.5 py-1 text-xs font-semibold transition-colors cursor-pointer ${activeCity === city
+                ? 'bg-[#0B4A4F] text-white'
+                : 'text-[#374151] hover:bg-[#E5ECEC]'
+                }`}
             >
               {city}
             </button>
@@ -841,11 +875,10 @@ export default function App() {
               key={cat}
               type="button"
               onClick={() => setActiveCategory(cat)}
-              className={`shrink-0 rounded-md border px-2.5 py-1 text-xs font-medium transition-colors cursor-pointer ${
-                activeCategory === cat
-                  ? 'border-[#0B4A4F] bg-[#EAF4F4] text-[#0B4A4F] font-semibold'
-                  : 'border-transparent bg-white text-[#4B5563] hover:border-[#D1D5DB]'
-              }`}
+              className={`shrink-0 rounded-md border px-2.5 py-1 text-xs font-medium transition-colors cursor-pointer ${activeCategory === cat
+                ? 'border-[#0B4A4F] bg-[#EAF4F4] text-[#0B4A4F] font-semibold'
+                : 'border-transparent bg-white text-[#4B5563] hover:border-[#D1D5DB]'
+                }`}
             >
               {cat}
             </button>
@@ -864,11 +897,10 @@ export default function App() {
               key={qp.id}
               type="button"
               onClick={() => setQuickPick((prev) => (prev === qp.id ? 'all' : qp.id))}
-              className={`shrink-0 rounded-md border px-2.5 py-1 text-xs font-bold transition-colors cursor-pointer ${
-                quickPick === qp.id
-                  ? 'border-[#D97706] bg-[#FEF3C7] text-[#92400E]'
-                  : 'border-[#E5E7EB] bg-white text-[#374151] hover:border-[#D97706]'
-              }`}
+              className={`shrink-0 rounded-md border px-2.5 py-1 text-xs font-bold transition-colors cursor-pointer ${quickPick === qp.id
+                ? 'border-[#D97706] bg-[#FEF3C7] text-[#92400E]'
+                : 'border-[#E5E7EB] bg-white text-[#374151] hover:border-[#D97706]'
+                }`}
             >
               {qp.label}
             </button>
@@ -880,9 +912,8 @@ export default function App() {
       <div className="flex-1 flex min-h-0 overflow-hidden relative">
         {/* LEFT RAIL: Either Google Maps-Style Rich Venue Detail Drawer OR High-Density Venue List */}
         <aside
-          className={`${
-            mobileView === 'list' ? 'flex' : 'hidden'
-          } lg:flex flex-col w-full lg:w-[430px] xl:w-[460px] shrink-0 border-r border-[#E4E8EB] bg-white min-h-0`}
+          className={`${mobileView === 'list' ? 'flex' : 'hidden'
+            } lg:flex flex-col w-full lg:w-[430px] xl:w-[460px] shrink-0 border-r border-[#E4E8EB] bg-white min-h-0`}
         >
           {selectedVenue ? (
             <VenueDetailDrawer
@@ -941,11 +972,10 @@ export default function App() {
                       key={tab.id}
                       type="button"
                       onClick={() => setActiveTab(tab.id)}
-                      className={`flex flex-col items-center justify-center gap-0.5 py-2.5 text-[11px] font-semibold border-b-2 transition-colors cursor-pointer ${
-                        active
-                          ? 'border-[#0B4A4F] text-[#0B4A4F] bg-[#F5FAFA]'
-                          : 'border-transparent text-[#6B7280] hover:text-[#111827]'
-                      }`}
+                      className={`flex flex-col items-center justify-center gap-0.5 py-2.5 text-[11px] font-semibold border-b-2 transition-colors cursor-pointer ${active
+                        ? 'border-[#0B4A4F] text-[#0B4A4F] bg-[#F5FAFA]'
+                        : 'border-transparent text-[#6B7280] hover:text-[#111827]'
+                        }`}
                     >
                       <Icon className="w-3.5 h-3.5" />
                       <span>
@@ -975,94 +1005,93 @@ export default function App() {
                     </div>
                   ) : (
                     <>
-                    {searchTerm.trim().length >= 2 && (
-                      <div className="px-3.5 py-2 bg-[#F0FDFA] border-b border-[#CCFBF1] flex items-center justify-between gap-2">
-                        <span className="text-[11px] text-[#134E4A] truncate">
-                          Aradığın <strong>“{searchTerm.trim()}”</strong> listede yok mu?
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => handleQuickCreateAndRate(searchTerm)}
-                          className="shrink-0 rounded-md bg-[#0B4A4F] px-2.5 py-1 text-[11px] font-bold text-white hover:bg-[#083A3E] cursor-pointer"
-                        >
-                          + Hemen Ekle &amp; Puanla
-                        </button>
-                      </div>
-                    )}
-                    {visibleVenues.slice(0, 200).map((venue) => {
-                      const rank = rankMap.get(venue.id);
-                      const isWant = wantSet.has(venue.id);
-
-                      return (
-                        <div
-                          key={venue.id}
-                          className="px-3.5 py-2.5 flex items-center justify-between gap-2.5 hover:bg-[#F8FAFB] transition-colors"
-                        >
+                      {searchTerm.trim().length >= 2 && (
+                        <div className="px-3.5 py-2 bg-[#F0FDFA] border-b border-[#CCFBF1] flex items-center justify-between gap-2">
+                          <span className="text-[11px] text-[#134E4A] truncate">
+                            Aradığın <strong>“{searchTerm.trim()}”</strong> listede yok mu?
+                          </span>
                           <button
                             type="button"
-                            onClick={() => setSelectedVenueId(venue.id)}
-                            className="flex items-center gap-3 flex-1 min-w-0 text-left cursor-pointer"
+                            onClick={() => handleQuickCreateAndRate(searchTerm)}
+                            className="shrink-0 rounded-md bg-[#0B4A4F] px-2.5 py-1 text-[11px] font-bold text-white hover:bg-[#083A3E] cursor-pointer"
                           >
-                            <VenueThumb venue={venue} size="md" liveThumb={liveThumbs[venue.id]} />
-                            <div className="min-w-0 flex-1">
-                              <div className="flex items-center gap-1.5">
-                                <span className="text-sm font-bold text-[#111827] truncate">
-                                  {venue.name}
-                                </span>
-                                {venue.googleRating && (
-                                  <span className="shrink-0 inline-flex items-center gap-0.5 rounded bg-[#FEF3C7] px-1.5 py-0.5 text-[10px] font-extrabold text-[#92400E] tabular-nums">
-                                    <Star className="w-2.5 h-2.5 fill-[#D97706] text-[#D97706]" />
-                                    {venue.googleRating.toFixed(1)}
-                                  </span>
-                                )}
-                              </div>
-                              <div className="text-xs text-[#6B7280] truncate mt-0.5">
-                                {venue.district}, {venue.city} · {venue.category} · {venue.priceTier}
-                              </div>
-                              <div className="text-[11px] text-[#4B5563] truncate mt-0.5">
-                                {venue.signatureDish}
-                              </div>
-                            </div>
+                            + Hemen Ekle &amp; Puanla
                           </button>
+                        </div>
+                      )}
+                      {visibleVenues.slice(0, 200).map((venue) => {
+                        const rank = rankMap.get(venue.id);
+                        const isWant = wantSet.has(venue.id);
 
-                          <div className="flex items-center gap-1.5 shrink-0">
-                            {rank ? (
-                              <button
-                                type="button"
-                                onClick={() => setRankingVenue(venue)}
-                                className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-extrabold text-white tabular-nums cursor-pointer"
-                                style={{ backgroundColor: scoreColor(rank.score) }}
-                                title="Yeniden sırala"
-                              >
-                                {rank.score.toFixed(1)}
-                              </button>
-                            ) : (
-                              <>
-                                <button
-                                  type="button"
-                                  onClick={() => handleToggleWant(venue.id)}
-                                  aria-label="Gideceklerime ekle"
-                                  className={`rounded-lg border p-2 cursor-pointer ${
-                                    isWant
-                                      ? 'border-[#0B4A4F] bg-[#0B4A4F] text-white'
-                                      : 'border-[#D1D5DB] bg-white text-[#4B5563] hover:border-[#0B4A4F]'
-                                  }`}
-                                >
-                                  {isWant ? <Check className="w-3.5 h-3.5" /> : <BookmarkPlus className="w-3.5 h-3.5" />}
-                                </button>
+                        return (
+                          <div
+                            key={venue.id}
+                            className="px-3.5 py-2.5 flex items-center justify-between gap-2.5 hover:bg-[#F8FAFB] transition-colors"
+                          >
+                            <button
+                              type="button"
+                              onClick={() => setSelectedVenueId(venue.id)}
+                              className="flex items-center gap-3 flex-1 min-w-0 text-left cursor-pointer"
+                            >
+                              <VenueThumb venue={venue} size="md" liveThumb={liveThumbs[venue.id]} />
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="text-sm font-bold text-[#111827] truncate">
+                                    {venue.name}
+                                  </span>
+                                  {venue.googleRating && (
+                                    <span className="shrink-0 inline-flex items-center gap-0.5 rounded bg-[#FEF3C7] px-1.5 py-0.5 text-[10px] font-extrabold text-[#92400E] tabular-nums">
+                                      <Star className="w-2.5 h-2.5 fill-[#D97706] text-[#D97706]" />
+                                      {venue.googleRating.toFixed(1)}
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="text-xs text-[#6B7280] truncate mt-0.5">
+                                  {venue.district}, {venue.city} · {venue.category} · {venue.priceTier}
+                                </div>
+                                <div className="text-[11px] text-[#4B5563] truncate mt-0.5">
+                                  {venue.signatureDish}
+                                </div>
+                              </div>
+                            </button>
+
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              {rank ? (
                                 <button
                                   type="button"
                                   onClick={() => setRankingVenue(venue)}
-                                  className="rounded-lg border border-[#D1D5DB] bg-white px-2.5 py-1.5 text-xs font-semibold text-[#111827] hover:border-[#0B4A4F] hover:text-[#0B4A4F] cursor-pointer"
+                                  className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-extrabold text-white tabular-nums cursor-pointer"
+                                  style={{ backgroundColor: scoreColor(rank.score) }}
+                                  title="Yeniden sırala"
                                 >
-                                  Sırala
+                                  {rank.score.toFixed(1)}
                                 </button>
-                              </>
-                            )}
+                              ) : (
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleToggleWant(venue.id)}
+                                    aria-label="Gideceklerime ekle"
+                                    className={`rounded-lg border p-2 cursor-pointer ${isWant
+                                      ? 'border-[#0B4A4F] bg-[#0B4A4F] text-white'
+                                      : 'border-[#D1D5DB] bg-white text-[#4B5563] hover:border-[#0B4A4F]'
+                                      }`}
+                                  >
+                                    {isWant ? <Check className="w-3.5 h-3.5" /> : <BookmarkPlus className="w-3.5 h-3.5" />}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setRankingVenue(venue)}
+                                    className="rounded-lg border border-[#D1D5DB] bg-white px-2.5 py-1.5 text-xs font-semibold text-[#111827] hover:border-[#0B4A4F] hover:text-[#0B4A4F] cursor-pointer"
+                                  >
+                                    Sırala
+                                  </button>
+                                </>
+                              )}
+                            </div>
                           </div>
-                        </div>
-                      );
-                    })}
+                        );
+                      })}
                     </>
                   ))}
 
@@ -1082,68 +1111,68 @@ export default function App() {
                     </div>
                   ) : (
                     <>
-                    <div className="px-3.5 py-2 border-b border-[#E5E7EB] bg-[#F8FAFB] flex items-center justify-between">
-                      <span className="text-[11px] font-semibold text-[#64748B]">Kişisel sıralaman</span>
-                      <button
-                        type="button"
-                        onClick={() => setDeckOpen(true)}
-                        className="rounded-md bg-[#0B4A4F]/10 px-2.5 py-1 text-[11px] font-bold text-[#0B4A4F] hover:bg-[#0B4A4F]/20 cursor-pointer"
-                      >
-                        Hızlı Kartlar
-                      </button>
-                    </div>
-                    {filteredRanked.map((entry, idx) => {
-                      const venue = venueMap.get(entry.venueId);
-                      if (!venue) return null;
-                      return (
-                        <div
-                          key={entry.venueId}
-                          className="px-3.5 py-2.5 flex items-center justify-between gap-2.5 hover:bg-[#F8FAFB]"
+                      <div className="px-3.5 py-2 border-b border-[#E5E7EB] bg-[#F8FAFB] flex items-center justify-between">
+                        <span className="text-[11px] font-semibold text-[#64748B]">Kişisel sıralaman</span>
+                        <button
+                          type="button"
+                          onClick={() => setDeckOpen(true)}
+                          className="rounded-md bg-[#0B4A4F]/10 px-2.5 py-1 text-[11px] font-bold text-[#0B4A4F] hover:bg-[#0B4A4F]/20 cursor-pointer"
                         >
-                          <button
-                            type="button"
-                            onClick={() => setSelectedVenueId(venue.id)}
-                            className="flex items-center gap-2.5 flex-1 min-w-0 text-left cursor-pointer"
+                          Hızlı Kartlar
+                        </button>
+                      </div>
+                      {filteredRanked.map((entry, idx) => {
+                        const venue = venueMap.get(entry.venueId);
+                        if (!venue) return null;
+                        return (
+                          <div
+                            key={entry.venueId}
+                            className="px-3.5 py-2.5 flex items-center justify-between gap-2.5 hover:bg-[#F8FAFB]"
                           >
-                            <span className="text-xs font-extrabold tabular-nums text-[#6B7280] w-5 shrink-0">
-                              #{idx + 1}
-                            </span>
-                            <VenueThumb venue={venue} size="sm" liveThumb={liveThumbs[venue.id]} />
-                            <div className="min-w-0 flex-1">
-                              <div className="text-sm font-bold text-[#111827] truncate">{venue.name}</div>
-                              <div className="text-xs text-[#6B7280] truncate">
-                                {venue.district}, {venue.city} · {venue.category}
+                            <button
+                              type="button"
+                              onClick={() => setSelectedVenueId(venue.id)}
+                              className="flex items-center gap-2.5 flex-1 min-w-0 text-left cursor-pointer"
+                            >
+                              <span className="text-xs font-extrabold tabular-nums text-[#6B7280] w-5 shrink-0">
+                                #{idx + 1}
+                              </span>
+                              <VenueThumb venue={venue} size="sm" liveThumb={liveThumbs[venue.id]} />
+                              <div className="min-w-0 flex-1">
+                                <div className="text-sm font-bold text-[#111827] truncate">{venue.name}</div>
+                                <div className="text-xs text-[#6B7280] truncate">
+                                  {venue.district}, {venue.city} · {venue.category}
+                                </div>
                               </div>
-                            </div>
-                          </button>
+                            </button>
 
-                          <div className="flex items-center gap-1 shrink-0">
-                            <span
-                              className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-extrabold text-white tabular-nums"
-                              style={{ backgroundColor: scoreColor(entry.score) }}
-                            >
-                              {entry.score.toFixed(1)}
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => setRankingVenue(venue)}
-                              aria-label="Yeniden sırala"
-                              className="rounded-lg p-1.5 text-[#6B7280] hover:bg-[#E5E7EB] cursor-pointer"
-                            >
-                              <ArrowLeftRight className="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveFromLists(venue.id)}
-                              aria-label="Listeden sil"
-                              className="rounded-lg p-1.5 text-[#6B7280] hover:text-[#DC2626] cursor-pointer"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
+                            <div className="flex items-center gap-1 shrink-0">
+                              <span
+                                className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-extrabold text-white tabular-nums"
+                                style={{ backgroundColor: scoreColor(entry.score) }}
+                              >
+                                {entry.score.toFixed(1)}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => setRankingVenue(venue)}
+                                aria-label="Yeniden sırala"
+                                className="rounded-lg p-1.5 text-[#6B7280] hover:bg-[#E5E7EB] cursor-pointer"
+                              >
+                                <ArrowLeftRight className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveFromLists(venue.id)}
+                                aria-label="Listeden sil"
+                                className="rounded-lg p-1.5 text-[#6B7280] hover:text-[#DC2626] cursor-pointer"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
                           </div>
-                        </div>
-                      );
-                    })}
+                        );
+                      })}
                     </>
                   ))}
 
@@ -1245,9 +1274,8 @@ export default function App() {
 
         {/* RIGHT FULL-BLEED 3D APPLE-STYLE VECTOR MAP */}
         <main
-          className={`${
-            mobileView === 'map' ? 'block' : 'hidden'
-          } lg:block flex-1 min-w-0 min-h-0 h-full`}
+          className={`${mobileView === 'map' ? 'block' : 'hidden'
+            } lg:block flex-1 min-w-0 min-h-0 h-full`}
         >
           <TurkeyMap3D
             city={activeCity}

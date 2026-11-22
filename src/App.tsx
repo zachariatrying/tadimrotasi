@@ -32,10 +32,7 @@ import type {
 import {
   CITY_CENTERS,
   CITY_TABS,
-  FRIENDS,
-  INITIAL_RANKED,
   INITIAL_VENUES,
-  INITIAL_WANT_TO_GO,
   VENUE_CATEGORIES,
 } from './data/venues';
 import { insertRankedVenue, recalculateScores, scoreColor } from './utils/elo';
@@ -61,6 +58,7 @@ import { ReelsCatcherModal } from './components/ReelsCatcherModal';
 import { FriendsTab } from './components/FriendsTab';
 import { AuthSyncModal } from './components/AuthSyncModal';
 import { LegalPrivacyModal } from './components/LegalPrivacyModal';
+import { QuickTasteDeckModal } from './components/QuickTasteDeckModal';
 
 const STORAGE_KEY = 'tadimrotasi_state_v5';
 const SEED_IDS = new Set(INITIAL_VENUES.map((v) => v.id));
@@ -68,8 +66,8 @@ const SEED_IDS = new Set(INITIAL_VENUES.map((v) => v.id));
 function createDefaultState(): TadimState {
   return {
     venues: INITIAL_VENUES,
-    ranked: INITIAL_RANKED,
-    wantToGoIds: INITIAL_WANT_TO_GO,
+    ranked: [],
+    wantToGoIds: [],
   };
 }
 
@@ -80,8 +78,8 @@ function loadState(): TadimState {
     const parsed = JSON.parse(raw) as TadimState;
     const customVenues = (parsed.venues ?? []).filter((v) => !SEED_IDS.has(v.id));
     return {
-      ranked: parsed.ranked ?? INITIAL_RANKED,
-      wantToGoIds: parsed.wantToGoIds ?? INITIAL_WANT_TO_GO,
+      ranked: parsed.ranked ?? [],
+      wantToGoIds: parsed.wantToGoIds ?? [],
       venues: [...customVenues, ...INITIAL_VENUES],
     };
   } catch {
@@ -132,6 +130,7 @@ export default function App() {
   const [catcherOpen, setCatcherOpen] = useState(false);
   const [authOpen, setAuthOpen] = useState(false);
   const [legalOpen, setLegalOpen] = useState(false);
+  const [deckOpen, setDeckOpen] = useState(false);
   const [cloudUser, setCloudUser] = useState<User | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [hiddenVenueIds, setHiddenVenueIds] = useState<string[]>(() => {
@@ -202,7 +201,7 @@ export default function App() {
   const allFriends = useMemo(() => {
     const seen = new Set<string>();
     const merged: FriendProfile[] = [];
-    for (const f of [...cloudFriends, ...customFriends, ...FRIENDS]) {
+    for (const f of [...cloudFriends, ...customFriends]) {
       if (seen.has(f.id)) continue;
       seen.add(f.id);
       merged.push(f);
@@ -628,6 +627,26 @@ export default function App() {
     [isAdmin]
   );
 
+  const handleQuickRate = useCallback((venue: Venue, tier: SentimentTier) => {
+    setState((prev) => {
+      const nextRanked = insertRankedVenue(
+        prev.ranked,
+        {
+          venueId: venue.id,
+          tier,
+          visitedAt: new Date().toISOString().slice(0, 10),
+          personalNote: '',
+        },
+        0
+      );
+      return {
+        ...prev,
+        ranked: recalculateScores(nextRanked),
+        wantToGoIds: prev.wantToGoIds.filter((id) => id !== venue.id),
+      };
+    });
+  }, []);
+
   const handleExportJson = () => {
     const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -1004,11 +1023,31 @@ export default function App() {
 
                 {activeTab === 'ranked' &&
                   (filteredRanked.length === 0 ? (
-                    <div className="p-8 text-center text-xs text-[#6B7280]">
-                      Bu şehirde henüz sıraladığın mekân yok. Keşfet sekmesinden veya 3D haritadan bir mekâna tıkla.
+                    <div className="p-6 text-center space-y-3">
+                      <div className="text-xs text-[#6B7280]">
+                        Bu şehirde henüz sıraladığın mekân yok. Gittiğin yerleri seçerek hemen kişisel listeni oluşturabilirsin.
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setDeckOpen(true)}
+                        className="inline-flex items-center gap-1.5 rounded-xl bg-[#0B4A4F] px-4 py-2.5 text-xs font-bold text-white hover:bg-[#083A3E] cursor-pointer"
+                      >
+                        Şehrindeki Ünlü Mekânlarla Hızlı Liste Oluştur
+                      </button>
                     </div>
                   ) : (
-                    filteredRanked.map((entry, idx) => {
+                    <>
+                    <div className="px-3.5 py-2 border-b border-[#E5E7EB] bg-[#F8FAFB] flex items-center justify-between">
+                      <span className="text-[11px] font-semibold text-[#64748B]">Kişisel sıralaman</span>
+                      <button
+                        type="button"
+                        onClick={() => setDeckOpen(true)}
+                        className="rounded-md bg-[#0B4A4F]/10 px-2.5 py-1 text-[11px] font-bold text-[#0B4A4F] hover:bg-[#0B4A4F]/20 cursor-pointer"
+                      >
+                        Hızlı Kartlar
+                      </button>
+                    </div>
+                    {filteredRanked.map((entry, idx) => {
                       const venue = venueMap.get(entry.venueId);
                       if (!venue) return null;
                       return (
@@ -1059,7 +1098,8 @@ export default function App() {
                           </div>
                         </div>
                       );
-                    })
+                    })}
+                    </>
                   ))}
 
                 {activeTab === 'want' &&
@@ -1213,6 +1253,18 @@ export default function App() {
         defaultCity={activeCity}
         onClose={() => setCatcherOpen(false)}
         onSaveVenue={handleSaveNewVenue}
+      />
+
+      <QuickTasteDeckModal
+        open={deckOpen}
+        initialCity={activeCity}
+        venues={state.venues}
+        alreadyRankedIds={new Set(state.ranked.map((r) => r.venueId))}
+        onClose={() => setDeckOpen(false)}
+        onRateVenue={handleQuickRate}
+        onWantVenue={(id) => {
+          if (!wantSet.has(id)) handleToggleWant(id);
+        }}
       />
 
       <AuthSyncModal

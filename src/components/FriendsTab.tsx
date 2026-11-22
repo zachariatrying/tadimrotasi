@@ -282,7 +282,16 @@ export function FriendsTab({
       )}
 
       {/* 3. Friends List */}
-      {friends.map((friend) => {
+      {friends.length === 0 ? (
+        <div className="p-6 text-center space-y-2">
+          <Users className="w-7 h-7 text-[#0B4A4F]/60 mx-auto" />
+          <div className="text-sm font-bold text-[#111827]">Henüz arkadaş eklemedin</div>
+          <p className="text-xs text-[#6B7280]">
+            Yukarıdan <span className="font-semibold">@kullaniciadi</span> arayarak veya davet linkiyle arkadaşlarını ekle, zevk uyumunuzu gör.
+          </p>
+        </div>
+      ) : (
+      friends.map((friend) => {
         const matchPct = computeTasteMatch(userRanked, friend);
         const isCustom = friend.id.startsWith('custom-');
         return (
@@ -371,7 +380,8 @@ export function FriendsTab({
             </ul>
           </article>
         );
-      })}
+      })
+      )}
     </div>
   );
 }

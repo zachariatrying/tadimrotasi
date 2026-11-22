@@ -9,7 +9,7 @@ create table if not exists public.profiles (
   handle text unique not null,
   display_name text not null,
   home_city text not null default 'İstanbul',
-  bio text default '',
+  bio text default ''
   is_public boolean not null default true,
   created_at timestamptz not null default now()
 );

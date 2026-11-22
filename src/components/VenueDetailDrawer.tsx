@@ -30,7 +30,7 @@ import {
 } from 'lucide-react';
 import type { FriendProfile, GoogleVisualReview, RankedVenue, Venue, VenuePhoto } from '../types';
 import { scoreColor } from '../utils/elo';
-import { getInstantVenuePhotos, resolveLiveVenueEnrichment } from '../utils/venuePhotos';
+import { resolveLiveVenueEnrichment } from '../utils/venuePhotos';
 import type { ActiveRouteData } from '../utils/routingAndGeo';
 import { fetchTerraceWeather, type TerraceWeatherInfo } from '../utils/terraceWeather';
 import {
@@ -51,6 +51,8 @@ interface VenueDetailDrawerProps {
   onStartRoute: (venue: Venue, mode: 'driving' | 'walking') => void;
   onClearRoute: () => void;
   onUpdateVenue?: (venueId: string, patch: Partial<Venue>) => void;
+  isAdmin?: boolean;
+  onAdminDeleteVenue?: (venueId: string) => void;
 }
 
 export function VenueDetailDrawer({
@@ -66,8 +68,18 @@ export function VenueDetailDrawer({
   onStartRoute,
   onClearRoute,
   onUpdateVenue,
+  isAdmin,
+  onAdminDeleteVenue,
 }: VenueDetailDrawerProps) {
-  const [photos, setPhotos] = useState<VenuePhoto[]>(() => getInstantVenuePhotos(venue));
+  const toGooglePhotos = (v: Venue): VenuePhoto[] =>
+    (v.googlePhotos ?? []).map((url, idx) => ({
+      url,
+      caption: `${v.name} · Google Haritalar #${idx + 1}`,
+      source: 'Google Fotoğrafı',
+      attribution: 'Google Haritalar',
+    }));
+
+  const [photos, setPhotos] = useState<VenuePhoto[]>(() => toGooglePhotos(venue));
   const [reviews, setReviews] = useState<GoogleVisualReview[]>(() => venue.googleReviews ?? []);
   const [loadingPhotos, setLoadingPhotos] = useState(true);
   const [googleRating, setGoogleRating] = useState<number | undefined>(venue.googleRating);
@@ -99,7 +111,7 @@ export function VenueDetailDrawer({
 
   useEffect(() => {
     let active = true;
-    setPhotos(getInstantVenuePhotos(venue));
+    setPhotos(toGooglePhotos(venue));
     setReviews(venue.googleReviews ?? []);
     setGoogleRating(venue.googleRating);
     setGoogleReviewCount(venue.googleReviewCount);
@@ -234,7 +246,12 @@ export function VenueDetailDrawer({
 
     void resolveLiveVenueEnrichment(venue).then((enriched) => {
       if (!active) return;
-      if (enriched.photos.length > 0) setPhotos(enriched.photos);
+      const nonStockPhotos = enriched.photos.filter(
+        (p) => !p.url.includes('wikimedia.org')
+      );
+      if (nonStockPhotos.length > 0) {
+        setPhotos((prev) => (prev.length > 0 ? prev : nonStockPhotos));
+      }
       if (enriched.googleRating) setGoogleRating(enriched.googleRating);
       if (enriched.googleReviewCount) setGoogleReviewCount(enriched.googleReviewCount);
       if (enriched.googleOpeningHours && !venue.openingHours) {
@@ -348,6 +365,16 @@ export function VenueDetailDrawer({
         {/* Hero Media Area */}
         {heroTab === 'photos' ? (
           <div className="relative bg-[#0F172A]">
+            {!primaryPhoto ? (
+              <div className="h-44 flex flex-col items-center justify-center gap-2 bg-[#F1F5F9] text-[#475569] px-4 text-center">
+                <Images className="w-6 h-6 text-[#0B4A4F]" />
+                <div className="text-xs font-semibold">
+                  {loadingPhotos
+                    ? 'Gerçek mekân fotoğrafları Google Haritalar’dan getiriliyor...'
+                    : 'Henüz gerçek mekân fotoğrafı bulunamadı. Google Harita veya Uydu sekmesinden inceleyebilirsiniz.'}
+                </div>
+              </div>
+            ) : (
             <div className="grid grid-cols-3 gap-0.5 h-52 sm:h-56">
               {primaryPhoto && (
                 <button
@@ -390,6 +417,7 @@ export function VenueDetailDrawer({
                 ))}
               </div>
             </div>
+            )}
 
             <button
               type="button"
@@ -528,37 +556,48 @@ export function VenueDetailDrawer({
                   className="rounded border border-[#D1D5DB] bg-white px-2 py-1 text-xs"
                 />
               </div>
-              <div className="flex justify-end gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => setEditingDetails(false)}
-                  className="rounded px-2.5 py-1 text-[11px] font-semibold text-[#6B7280] cursor-pointer"
-                >
-                  İptal
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const latNum = Number(editLat);
-                    const lngNum = Number(editLng);
-                    const validCoords =
-                      Number.isFinite(latNum) &&
-                      Number.isFinite(lngNum) &&
-                      latNum >= 35.5 &&
-                      latNum <= 42.5 &&
-                      lngNum >= 25.5 &&
-                      lngNum <= 45.0;
-                    onUpdateVenue(venue.id, {
-                      name: editName.trim() || venue.name,
-                      district: editDistrict.trim() || venue.district,
-                      ...(validCoords ? { lat: latNum, lng: lngNum, gpsVerified: true } : {}),
-                    });
-                    setEditingDetails(false);
-                  }}
-                  className="rounded bg-[#0B4A4F] px-3 py-1 text-[11px] font-bold text-white cursor-pointer"
-                >
-                  Kaydet
-                </button>
+              <div className="flex items-center justify-between gap-1.5">
+                {isAdmin && onAdminDeleteVenue ? (
+                  <button
+                    type="button"
+                    onClick={() => onAdminDeleteVenue(venue.id)}
+                    className="rounded border border-[#FECACA] bg-[#FEF2F2] px-2.5 py-1 text-[11px] font-bold text-[#B91C1C] cursor-pointer"
+                  >
+                    Mekânı Sil (Admin)
+                  </button>
+                ) : <span />}
+                <div className="flex gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setEditingDetails(false)}
+                    className="rounded px-2.5 py-1 text-[11px] font-semibold text-[#6B7280] cursor-pointer"
+                  >
+                    İptal
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const latNum = Number(editLat);
+                      const lngNum = Number(editLng);
+                      const validCoords =
+                        Number.isFinite(latNum) &&
+                        Number.isFinite(lngNum) &&
+                        latNum >= 35.5 &&
+                        latNum <= 42.5 &&
+                        lngNum >= 25.5 &&
+                        lngNum <= 45.0;
+                      onUpdateVenue(venue.id, {
+                        name: editName.trim() || venue.name,
+                        district: editDistrict.trim() || venue.district,
+                        ...(validCoords ? { lat: latNum, lng: lngNum, gpsVerified: true } : {}),
+                      });
+                      setEditingDetails(false);
+                    }}
+                    className="rounded bg-[#0B4A4F] px-3 py-1 text-[11px] font-bold text-white cursor-pointer"
+                  >
+                    Kaydet
+                  </button>
+                </div>
               </div>
             </div>
           )}

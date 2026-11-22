@@ -7,12 +7,14 @@ import {
   isSupabaseConfigured,
   pullStateFromCloud,
   pushStateToCloud,
+  signInWithOAuthProvider,
   upsertMyProfile,
 } from '../lib/supabase';
 
 interface AuthSyncModalProps {
   open: boolean;
   user: User | null;
+  isAdmin?: boolean;
   state: TadimState;
   onClose: () => void;
   onUserChange: (user: User | null) => void;
@@ -22,6 +24,7 @@ interface AuthSyncModalProps {
 export function AuthSyncModal({
   open,
   user,
+  isAdmin,
   state,
   onClose,
   onUserChange,
@@ -179,9 +182,16 @@ export function AuthSyncModal({
           ) : user ? (
             <div className="space-y-3">
               <div className="rounded-lg bg-[#ECFDF5] border border-[#A7F3D0] p-3.5 text-xs">
-                <div className="flex items-center gap-1.5 font-bold text-[#047857]">
-                  <CheckCircle2 className="w-4 h-4" />
-                  Bağlı Hesap
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 font-bold text-[#047857]">
+                    <CheckCircle2 className="w-4 h-4" />
+                    Bağlı Hesap
+                  </div>
+                  {isAdmin && (
+                    <span className="rounded bg-[#0B4A4F] px-2 py-0.5 text-[10px] font-bold text-white">
+                      Admin
+                    </span>
+                  )}
                 </div>
                 <div className="text-[#111827] mt-1 font-semibold">{user.email}</div>
               </div>
@@ -299,6 +309,25 @@ export function AuthSyncModal({
               >
                 {busy ? 'İşleniyor...' : mode === 'login' ? 'Giriş Yap' : 'Hesap Oluştur'}
               </button>
+
+              <div className="grid grid-cols-2 gap-2 pt-1">
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => void signInWithOAuthProvider('google').catch((err) => setStatusMsg(err instanceof Error ? err.message : 'Google girişi başlatılamadı.'))}
+                  className="rounded-lg border border-[#D8E0E4] bg-white py-2 text-xs font-bold text-[#111827] hover:bg-[#F3F6F8] cursor-pointer"
+                >
+                  Google ile Devam Et
+                </button>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => void signInWithOAuthProvider('apple').catch((err) => setStatusMsg(err instanceof Error ? err.message : 'Apple girişi başlatılamadı.'))}
+                  className="rounded-lg border border-[#111827] bg-[#111827] py-2 text-xs font-bold text-white hover:bg-[#1F2937] cursor-pointer"
+                >
+                  Apple ile Devam Et
+                </button>
+              </div>
             </form>
           )}
 

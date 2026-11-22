@@ -237,3 +237,54 @@ export async function fetchFollowingProfiles(followerId: string): Promise<Friend
     ratings: (ranksByUser.get(String(p.id)) ?? []).slice(0, 12),
   }));
 }
+
+export async function getIsAdmin(userId: string): Promise<boolean> {
+  const sb = getSupabase();
+  if (!sb) return false;
+  const { data, error } = await sb
+    .from('profiles')
+    .select('is_admin')
+    .eq('id', userId)
+    .maybeSingle();
+  if (error || !data) return false;
+  return Boolean(data.is_admin);
+}
+
+export async function adminUpdateVenueInCloud(venue: Venue): Promise<void> {
+  const sb = getSupabase();
+  if (!sb) return;
+  const { error } = await sb.from('venues').upsert(
+    {
+      id: venue.id,
+      name: venue.name,
+      city: venue.city,
+      district: venue.district,
+      category: venue.category,
+      price_tier: venue.priceTier,
+      lat: venue.lat,
+      lng: venue.lng,
+      signature_dish: venue.signatureDish,
+    },
+    { onConflict: 'id' }
+  );
+  if (error) throw error;
+}
+
+export async function adminDeleteVenueInCloud(venueId: string): Promise<void> {
+  const sb = getSupabase();
+  if (!sb) return;
+  const { error } = await sb.from('venues').delete().eq('id', venueId);
+  if (error) throw error;
+}
+
+export async function signInWithOAuthProvider(provider: 'google' | 'apple'): Promise<void> {
+  const sb = getSupabase();
+  if (!sb) throw new Error('Supabase yapılandırılmamış.');
+  const { error } = await sb.auth.signInWithOAuth({
+    provider,
+    options: {
+      redirectTo: `${window.location.origin}${window.location.pathname}`,
+    },
+  });
+  if (error) throw error;
+}

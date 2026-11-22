@@ -46,9 +46,12 @@ import { searchLiveTurkeyRestaurants } from './utils/geocoder';
 import { fetchQuickGoogleMapsThumb, getCachedVenueThumb } from './utils/pythonGmapsClient';
 import { calculateInAppRoute, type ActiveRouteData } from './utils/routingAndGeo';
 import {
+  adminDeleteVenueInCloud,
+  adminUpdateVenueInCloud,
   deleteAllCloudUserData,
   fetchFollowingProfiles,
   getCurrentUser,
+  getIsAdmin,
   isSupabaseConfigured,
 } from './lib/supabase';
 import { TurkeyMap3D } from './components/TurkeyMap3D';
@@ -130,6 +133,7 @@ export default function App() {
   const [authOpen, setAuthOpen] = useState(false);
   const [legalOpen, setLegalOpen] = useState(false);
   const [cloudUser, setCloudUser] = useState<User | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [copiedShare, setCopiedShare] = useState(false);
   const [loadingLiveOsm, setLoadingLiveOsm] = useState(false);
   const [liveOsmMsg, setLiveOsmMsg] = useState<string | null>(null);
@@ -172,7 +176,12 @@ export default function App() {
 
   useEffect(() => {
     void refreshCloudFriends();
-  }, [refreshCloudFriends]);
+    if (cloudUser && isSupabaseConfigured) {
+      void getIsAdmin(cloudUser.id).then(setIsAdmin);
+    } else {
+      setIsAdmin(false);
+    }
+  }, [refreshCloudFriends, cloudUser]);
 
   const allFriends = useMemo(() => {
     const seen = new Set<string>();
@@ -557,12 +566,38 @@ export default function App() {
     setCustomFriends((prev) => prev.filter((f) => f.id !== friendId));
   };
 
-  const handleUpdateVenueDetails = useCallback((venueId: string, patch: Partial<Venue>) => {
-    setState((prev) => ({
-      ...prev,
-      venues: prev.venues.map((v) => (v.id === venueId ? { ...v, ...patch } : v)),
-    }));
-  }, []);
+  const handleUpdateVenueDetails = useCallback(
+    (venueId: string, patch: Partial<Venue>) => {
+      setState((prev) => {
+        let updatedVenue: Venue | null = null;
+        const nextVenues = prev.venues.map((v) => {
+          if (v.id !== venueId) return v;
+          updatedVenue = { ...v, ...patch };
+          return updatedVenue;
+        });
+        if (isAdmin && updatedVenue) {
+          void adminUpdateVenueInCloud(updatedVenue).catch(() => {});
+        }
+        return { ...prev, venues: nextVenues };
+      });
+    },
+    [isAdmin]
+  );
+
+  const handleAdminDeleteVenue = useCallback(
+    (venueId: string) => {
+      if (!isAdmin) return;
+      setState((prev) => ({
+        ...prev,
+        venues: prev.venues.filter((v) => v.id !== venueId),
+        ranked: prev.ranked.filter((r) => r.venueId !== venueId),
+        wantToGoIds: prev.wantToGoIds.filter((id) => id !== venueId),
+      }));
+      setSelectedVenueId(null);
+      void adminDeleteVenueInCloud(venueId).catch(() => {});
+    },
+    [isAdmin]
+  );
 
   const handleExportJson = () => {
     const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
@@ -786,6 +821,8 @@ export default function App() {
               onStartRoute={(v, mode) => void handleStartRoute(v, mode)}
               onClearRoute={() => setActiveRoute(null)}
               onUpdateVenue={handleUpdateVenueDetails}
+              isAdmin={isAdmin}
+              onAdminDeleteVenue={handleAdminDeleteVenue}
             />
           ) : (
             <>
@@ -1151,6 +1188,7 @@ export default function App() {
       <AuthSyncModal
         open={authOpen}
         user={cloudUser}
+        isAdmin={isAdmin}
         state={state}
         onClose={() => setAuthOpen(false)}
         onUserChange={setCloudUser}

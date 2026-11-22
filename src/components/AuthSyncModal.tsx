@@ -101,7 +101,13 @@ export function AuthSyncModal({
       await pushStateToCloud(user.id, state);
       setStatusMsg('Tüm sıralamaların ve Gideceklerim listen Supabase bulutuna kaydedildi.');
     } catch (err) {
-      setStatusMsg(err instanceof Error ? err.message : 'Bulut kaydı sırasında hata oluştu.');
+      const msg =
+        err instanceof Error
+          ? err.message
+          : typeof err === 'object' && err !== null && 'message' in err
+            ? String((err as { message: unknown }).message)
+            : 'Bulut kaydı sırasında hata oluştu.';
+      setStatusMsg(msg);
     } finally {
       setBusy(false);
     }
@@ -120,7 +126,13 @@ export function AuthSyncModal({
         setStatusMsg('Bulutta henüz kayıtlı listen yok; önce "Buluta Gönder" ile kaydedebilirsin.');
       }
     } catch (err) {
-      setStatusMsg(err instanceof Error ? err.message : 'Buluttan veri okunamadı.');
+      const msg =
+        err instanceof Error
+          ? err.message
+          : typeof err === 'object' && err !== null && 'message' in err
+            ? String((err as { message: unknown }).message)
+            : 'Buluttan veri okunamadı.';
+      setStatusMsg(msg);
     } finally {
       setBusy(false);
     }

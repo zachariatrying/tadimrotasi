@@ -31,24 +31,32 @@ export async function pushStateToCloud(userId: string, state: TadimState): Promi
   const sb = getSupabase();
   if (!sb) throw new Error('Supabase yapılandırılmamış.');
 
-  // Upsert venues
-  const venueRows = state.venues.map((v) => ({
-    id: v.id,
-    created_by: userId,
-    name: v.name,
-    city: v.city,
-    district: v.district,
-    category: v.category,
-    price_tier: v.priceTier,
-    lat: v.lat,
-    lng: v.lng,
-    signature_dish: v.signatureDish,
-    source_url: v.sourceUrl ?? null,
-    source_platform: v.sourcePlatform ?? null,
-  }));
+  // Upsert only venues referenced by user's ranked or wantToGo lists
+  const referencedIds = new Set([
+    ...state.ranked.map((r) => r.venueId),
+    ...state.wantToGoIds,
+  ]);
+  const venueRows = state.venues
+    .filter((v) => referencedIds.has(v.id))
+    .map((v) => ({
+      id: v.id,
+      created_by: userId,
+      name: v.name,
+      city: v.city,
+      district: v.district,
+      category: v.category,
+      price_tier: v.priceTier,
+      lat: v.lat,
+      lng: v.lng,
+      signature_dish: v.signatureDish,
+      source_url: v.sourceUrl ?? null,
+      source_platform: v.sourcePlatform ?? null,
+    }));
 
   if (venueRows.length > 0) {
-    const { error: vErr } = await sb.from('venues').upsert(venueRows, { onConflict: 'id' });
+    const { error: vErr } = await sb
+      .from('venues')
+      .upsert(venueRows, { onConflict: 'id', ignoreDuplicates: true });
     if (vErr) throw vErr;
   }
 

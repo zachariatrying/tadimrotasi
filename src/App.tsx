@@ -46,10 +46,12 @@ import {
   adminDeleteVenueInCloud,
   adminUpdateVenueInCloud,
   deleteAllCloudUserData,
+  fetchFollowingFeed,
   fetchFollowingProfiles,
   getCurrentUser,
   getIsAdmin,
   isSupabaseConfigured,
+  type FeedActivityItem,
 } from './lib/supabase';
 import { TurkeyMap3D } from './components/TurkeyMap3D';
 import { VenueDetailDrawer } from './components/VenueDetailDrawer';
@@ -202,6 +204,7 @@ export default function App() {
     }
   });
   const [cloudFriends, setCloudFriends] = useState<FriendProfile[]>([]);
+  const [cloudFeed, setCloudFeed] = useState<FeedActivityItem[]>([]);
 
   useEffect(() => {
     try {
@@ -214,11 +217,16 @@ export default function App() {
   const refreshCloudFriends = useCallback(async () => {
     if (!cloudUser || !isSupabaseConfigured) {
       setCloudFriends([]);
+      setCloudFeed([]);
       return;
     }
     try {
-      const list = await fetchFollowingProfiles(cloudUser.id);
+      const [list, feed] = await Promise.all([
+        fetchFollowingProfiles(cloudUser.id),
+        fetchFollowingFeed(cloudUser.id),
+      ]);
       setCloudFriends(list);
+      setCloudFeed(feed);
     } catch {
       // Ignore offline
     }
@@ -1233,6 +1241,7 @@ export default function App() {
                 {activeTab === 'friends' && (
                   <FriendsTab
                     friends={allFriends}
+                    cloudFeed={cloudFeed}
                     venues={state.venues}
                     userRanked={state.ranked}
                     wantToGoIds={state.wantToGoIds}

@@ -8,11 +8,13 @@ import {
   isSupabaseConfigured,
   searchPublicProfiles,
   unfollowUser,
+  type FeedActivityItem,
   type PublicProfileSummary,
 } from '../lib/supabase';
 
 interface FriendsTabProps {
   friends: FriendProfile[];
+  cloudFeed?: FeedActivityItem[];
   venues: Venue[];
   userRanked: RankedVenue[];
   wantToGoIds: string[];
@@ -28,6 +30,7 @@ interface FriendsTabProps {
 
 export function FriendsTab({
   friends,
+  cloudFeed = [],
   venues,
   userRanked,
   wantToGoIds,
@@ -44,11 +47,46 @@ export function FriendsTab({
   const [feedback, setFeedback] = useState<string | null>(null);
   const [searchResults, setSearchResults] = useState<PublicProfileSummary[]>([]);
   const [searching, setSearching] = useState(false);
+  const [subTab, setSubTab] = useState<'feed' | 'friends'>('feed');
 
   const venueMap = useMemo(() => new Map(venues.map((v) => [v.id, v])), [venues]);
   const rankedSet = useMemo(() => new Set(userRanked.map((r) => r.venueId)), [userRanked]);
   const wantSet = useMemo(() => new Set(wantToGoIds), [wantToGoIds]);
   const friendIds = useMemo(() => new Set(friends.map((f) => f.id)), [friends]);
+  const matchByFriendId = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const f of friends) m.set(f.id, computeTasteMatch(userRanked, f));
+    return m;
+  }, [friends, userRanked]);
+
+  const combinedFeed = useMemo(() => {
+    const seen = new Set<string>();
+    const items: FeedActivityItem[] = [];
+    for (const item of cloudFeed) {
+      if (seen.has(item.id)) continue;
+      seen.add(item.id);
+      items.push(item);
+    }
+    for (const f of friends) {
+      for (const r of f.ratings) {
+        const id = `${f.id}-${r.venueId}`;
+        if (seen.has(id)) continue;
+        seen.add(id);
+        items.push({
+          id,
+          userId: f.id,
+          userName: f.name,
+          userHandle: f.handle,
+          avatarBg: f.avatarBg,
+          venueId: r.venueId,
+          score: r.score,
+          note: r.note,
+          visitedAt: '',
+        });
+      }
+    }
+    return items.slice(0, 30);
+  }, [cloudFeed, friends]);
 
   // Taste-matched recommendation feed from people with >= 75% compatibility
   const compatibleRecs = useMemo(() => {
@@ -146,6 +184,118 @@ export function FriendsTab({
 
   return (
     <div className="divide-y divide-[#E5E7EB]">
+      {/* Sub-navigation: Letterboxd Feed vs Friends */}
+      <div className="grid grid-cols-2 gap-1 p-2 bg-[#F8FAFB]">
+        <button
+          type="button"
+          onClick={() => setSubTab('feed')}
+          className={`rounded-lg py-1.5 text-xs font-bold cursor-pointer ${
+            subTab === 'feed'
+              ? 'bg-[#0B4A4F] text-white shadow-xs'
+              : 'text-[#4B5563] hover:bg-white'
+          }`}
+        >
+          Akış ({combinedFeed.length})
+        </button>
+        <button
+          type="button"
+          onClick={() => setSubTab('friends')}
+          className={`rounded-lg py-1.5 text-xs font-bold cursor-pointer ${
+            subTab === 'friends'
+              ? 'bg-[#0B4A4F] text-white shadow-xs'
+              : 'text-[#4B5563] hover:bg-white'
+          }`}
+        >
+          Çevre &amp; Öneriler ({friends.length})
+        </button>
+      </div>
+
+      {subTab === 'feed' ? (
+        combinedFeed.length === 0 ? (
+          <div className="p-6 text-center space-y-2">
+            <Users className="w-7 h-7 text-[#0B4A4F]/60 mx-auto" />
+            <div className="text-sm font-bold text-[#111827]">Akışın henüz boş</div>
+            <p className="text-xs text-[#6B7280]">
+              “Çevre &amp; Öneriler” sekmesinden arkadaşlarını eklediğinde son puanladıkları mekânlar burada akacak.
+            </p>
+            <button
+              type="button"
+              onClick={() => setSubTab('friends')}
+              className="rounded-lg bg-[#0B4A4F] px-3.5 py-1.5 text-xs font-bold text-white cursor-pointer"
+            >
+              Arkadaş Ekle
+            </button>
+          </div>
+        ) : (
+          combinedFeed.map((act) => {
+            const venue = venueMap.get(act.venueId);
+            if (!venue) return null;
+            const matchPct = matchByFriendId.get(act.userId);
+            const alreadySaved = rankedSet.has(venue.id) || wantSet.has(venue.id);
+            return (
+              <article key={act.id} className="p-4 space-y-2 hover:bg-[#F9FAFB]">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div
+                      className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold text-white shrink-0"
+                      style={{ backgroundColor: act.avatarBg }}
+                    >
+                      {act.userName.slice(0, 1)}
+                    </div>
+                    <div className="min-w-0">
+                      <span className="text-xs font-bold text-[#111827]">{act.userName}</span>{' '}
+                      <span className="text-[11px] text-[#6B7280]">{act.userHandle}</span>
+                    </div>
+                  </div>
+                  {matchPct !== undefined && (
+                    <span className="rounded bg-[#ECFDF5] px-2 py-0.5 text-[10px] font-bold text-[#047857] tabular-nums">
+                      %{matchPct} uyum
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex items-center justify-between gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => onFocusVenue(venue.id)}
+                    className="flex-1 text-left min-w-0 cursor-pointer"
+                  >
+                    <div className="text-sm font-extrabold text-[#111827] truncate">
+                      {venue.name}{' '}
+                      <span className="font-normal text-xs text-[#6B7280]">· {venue.district}</span>
+                    </div>
+                    {act.note && (
+                      <p className="text-xs text-[#4B5563] mt-0.5 line-clamp-2">“{act.note}”</p>
+                    )}
+                  </button>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <span
+                      className="inline-flex items-center justify-center w-8 h-8 rounded-full text-xs font-extrabold text-white tabular-nums"
+                      style={{ backgroundColor: scoreColor(act.score) }}
+                    >
+                      {act.score.toFixed(1)}
+                    </span>
+                    <button
+                      type="button"
+                      disabled={alreadySaved}
+                      onClick={() => onAddWantToGo(venue.id)}
+                      className={`rounded-md p-1.5 border ${
+                        alreadySaved
+                          ? 'border-[#A7F3D0] bg-[#ECFDF5] text-[#059669]'
+                          : 'border-[#D1D5DB] bg-white text-[#374151] hover:border-[#0B4A4F] cursor-pointer'
+                      }`}
+                      title={alreadySaved ? 'Listende var' : 'Gideceklerime ekle'}
+                    >
+                      {alreadySaved ? <Check className="w-3.5 h-3.5" /> : <BookmarkPlus className="w-3.5 h-3.5" />}
+                    </button>
+                  </div>
+                </div>
+              </article>
+            );
+          })
+        )
+      ) : (
+      <>
       {/* 1. Add Friend & Invite Card */}
       <section className="p-4 bg-[#F8FAFB] space-y-2.5">
         <div className="flex items-center justify-between gap-2">
@@ -381,6 +531,8 @@ export function FriendsTab({
           </article>
         );
       })
+      )}
+      </>
       )}
     </div>
   );

@@ -296,3 +296,62 @@ export async function signInWithOAuthProvider(provider: 'google' | 'apple'): Pro
   });
   if (error) throw error;
 }
+
+export interface FeedActivityItem {
+  id: string;
+  userId: string;
+  userName: string;
+  userHandle: string;
+  avatarBg: string;
+  venueId: string;
+  score: number;
+  note: string;
+  visitedAt: string;
+}
+
+export async function fetchFollowingFeed(followerId: string): Promise<FeedActivityItem[]> {
+  const sb = getSupabase();
+  if (!sb) return [];
+  const { data: followRows, error: fErr } = await sb
+    .from('follows')
+    .select('following_id')
+    .eq('follower_id', followerId);
+  if (fErr || !followRows?.length) return [];
+
+  const ids = followRows.map((r) => String(r.following_id));
+  const [profRes, rankRes] = await Promise.all([
+    sb.from('profiles').select('id, handle, display_name').in('id', ids),
+    sb
+      .from('user_rankings')
+      .select('user_id, venue_id, score, personal_note, visited_at, updated_at')
+      .in('user_id', ids)
+      .order('updated_at', { ascending: false })
+      .limit(30),
+  ]);
+  if (profRes.error || rankRes.error || !profRes.data || !rankRes.data) return [];
+
+  const profMap = new Map<string, { name: string; handle: string; bg: string }>();
+  profRes.data.forEach((p, idx) => {
+    profMap.set(String(p.id), {
+      name: String(p.display_name || p.handle),
+      handle: `@${String(p.handle)}`,
+      bg: AVATAR_PALETTE[idx % AVATAR_PALETTE.length],
+    });
+  });
+
+  return rankRes.data.map((r) => {
+    const uid = String(r.user_id);
+    const prof = profMap.get(uid);
+    return {
+      id: `${uid}-${String(r.venue_id)}`,
+      userId: uid,
+      userName: prof?.name ?? 'Gurme',
+      userHandle: prof?.handle ?? '@kullanici',
+      avatarBg: prof?.bg ?? '#0B4A4F',
+      venueId: String(r.venue_id),
+      score: Number(r.score),
+      note: String(r.personal_note || ''),
+      visitedAt: String(r.visited_at || ''),
+    };
+  });
+}

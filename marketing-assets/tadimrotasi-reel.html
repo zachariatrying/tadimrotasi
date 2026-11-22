@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TadımRotası — 9:16 Reels Tanıtım Videosu</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #091315; display: grid; place-items: center; min-height: 100vh; font-family: system-ui, -apple-system, sans-serif; }
+    .stage {
+      width: min(100vw, 405px); aspect-ratio: 9 / 16; position: relative; overflow: hidden;
+      border-radius: 24px; background: linear-gradient(165deg, #0B4A4F 0%, #07292C 100%);
+      color: #fff; box-shadow: 0 30px 80px rgba(0,0,0,0.6);
+    }
+    .scene {
+      position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center;
+      padding: 36px 28px; opacity: 0; transform: translateY(18px);
+      animation: cycle 12s infinite;
+    }
+    .s1 { animation-delay: 0s; }
+    .s2 { animation-delay: 4s; }
+    .s3 { animation-delay: 8s; }
+    @keyframes cycle {
+      0% { opacity: 0; transform: translateY(18px); }
+      6%, 28% { opacity: 1; transform: translateY(0); }
+      33%, 100% { opacity: 0; transform: translateY(-18px); }
+    }
+    .pill { display: inline-block; background: rgba(255,255,255,0.14); border: 1px solid rgba(255,255,255,0.22); padding: 6px 14px; border-radius: 999px; font-size: 13px; font-weight: 700; margin-bottom: 18px; width: fit-content; }
+    h1 { font-size: 36px; line-height: 1.12; font-weight: 800; letter-spacing: -0.02em; }
+    p { margin-top: 14px; font-size: 16px; line-height: 1.5; color: #CCFBF1; }
+    .card { margin-top: 24px; background: #fff; color: #111827; border-radius: 18px; padding: 18px; box-shadow: 0 14px 30px rgba(0,0,0,0.25); }
+    .row { display: flex; align-items: center; justify-content: space-between; font-weight: 800; font-size: 15px; }
+    .score { background: #059669; color: #fff; padding: 6px 10px; border-radius: 999px; font-size: 13px; }
+    .cta { margin-top: 26px; background: #F59E0B; color: #111827; text-align: center; padding: 14px; border-radius: 14px; font-weight: 800; font-size: 16px; }
+  </style>
+</head>
+<body>
+  <div class="stage">
+    <div class="scene s1">
+      <span class="pill">Reels'te görüp unutma</span>
+      <h1>Arkadaşının “kesin git” dediği yer gerçekten iyi mi?</h1>
+      <p>TadımRotası ile gittiğin mekânları 0–10 arası sırala, arkadaşlarınla zevk uyumunu ölç.</p>
+    </div>
+    <div class="scene s2">
+      <span class="pill">3.400+ Türkiye Mekânı</span>
+      <h1>Letterboxd gibi arkadaş akışı</h1>
+      <div class="card">
+        <div class="row"><span>Ciğerci Mahmut · Seyhan</span><span class="score">9.4</span></div>
+        <p style="color:#4B5563;font-size:13px;margin-top:8px;">%92 zevk uyumu olan arkadaşın önerdi.</p>
+      </div>
+    </div>
+    <div class="scene s3">
+      <span class="pill">Ücretsiz &amp; Reklamsız</span>
+      <h1>30 saniyede şehrindeki listeni kur</h1>
+      <p>Web'de hemen aç veya Android APK'yı indir.</p>
+      <div class="cta">zachariatrying.github.io/tadimrotasi</div>
+    </div>
+  </div>
+</body>
+</html>

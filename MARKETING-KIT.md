@@ -22,3 +22,11 @@ Uygulama URL'deki `?sehir=` parametresini okuyup doğrudan o şehri seçili aça
 1. **Zevk Uyumu Kancası:** *"Arkadaşının 'kesin git' dediği mekân gerçekten senin damak tadına uyuyor mu? İkili sıralamayla % uyumunu ölç."*
 2. **Reels Kurtarıcı Kancası:** *"Instagram'da kaydedip asla bulamadığın o restoranları tek haritada topladık."*
 3. **Adana / Semt Kartları Kancası:** *"Şehrindeki en iyi 10 mekânı 30 saniyede kartlardan seç, kişisel gurme listen hazır olsun."*
+
+## 4. 30 Günlük Organik + Reklam Büyüme Takvimi
+| Hafta | Odak | Aksiyon &amp; Varlık |
+| :---: | :--- | :--- |
+| **1** | Şehir Kartları &amp; İlk Kullanıcılar | `marketing-assets/tadimrotasi-reels-poster.png` (9:16 Story) + `?sehir=Adana` ve `?sehir=İstanbul` linkleriyle ilk 3 Reels yayını |
+| **2** | Arkadaş Zevk Uyumu Döngüsü | `marketing-assets/tadimrotasi-reel.html` videosunu paylaş, *"Beni ekle % uyumumuzu ölçelim"* akımı başlat |
+| **3** | Google Arama Testi | Yukarıdaki ≤ 30 karakter başlıklarla düşük bütçeli yerel arama testi (`Adana en iyi kebapçı`, `İstanbul gurme haritası`) |
+| **4** | Optimizasyon &amp; APK Lansmanı | En yüksek tıklama alan şehir UTM'ine bütçe kaydır, Android APK indirme bağlantısını öne çıkar |

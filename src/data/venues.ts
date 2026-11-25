@@ -62,6 +62,44 @@ export const CITY_NEIGHBORHOODS: Partial<Record<CityName, NeighborhoodHotspot[]>
     { label: 'Kemeraltı · Konak', lat: 38.4205, lng: 27.1332, zoom: 15.6 },
     { label: 'Urla', lat: 38.3232, lng: 26.7648, zoom: 15.3 },
   ],
+  Gaziantep: [
+    { label: 'Uzun Çarşı', lat: 37.0632, lng: 37.3808, zoom: 15.8 },
+    { label: 'Şehitkamil', lat: 37.0714, lng: 37.3679, zoom: 15.5 },
+  ],
+  Antalya: [
+    { label: 'Kaleiçi', lat: 36.8848, lng: 30.7048, zoom: 15.8 },
+    { label: 'Konyaaltı', lat: 36.8675, lng: 30.6422, zoom: 15.4 },
+    { label: 'Lara', lat: 36.8545, lng: 30.7850, zoom: 15.2 },
+  ],
+  Bursa: [
+    { label: 'Hanlar · Koza Han', lat: 40.1844, lng: 29.0622, zoom: 15.8 },
+    { label: 'Nilüfer', lat: 40.2118, lng: 28.9800, zoom: 15.2 },
+  ],
+  Adana: [
+    { label: 'Seyhan Merkez', lat: 36.9948, lng: 35.3228, zoom: 15.6 },
+    { label: 'Çukurova', lat: 37.0431, lng: 35.3082, zoom: 15.2 },
+  ],
+  Eskişehir: [
+    { label: 'Odunpazarı', lat: 39.7662, lng: 30.5251, zoom: 15.8 },
+    { label: 'Porsuk · Tepebaşı', lat: 39.7789, lng: 30.5152, zoom: 15.6 },
+  ],
+  Trabzon: [
+    { label: 'Meydan', lat: 41.0058, lng: 39.7269, zoom: 15.8 },
+    { label: 'Akçaabat', lat: 41.0226, lng: 39.5742, zoom: 15.4 },
+  ],
+  Konya: [
+    { label: 'Mevlana · Karatay', lat: 37.8718, lng: 32.5018, zoom: 15.7 },
+    { label: 'Selçuklu', lat: 37.8842, lng: 32.4918, zoom: 15.3 },
+  ],
+  Muğla: [
+    { label: 'Bodrum Marina', lat: 37.0342, lng: 27.4285, zoom: 15.6 },
+    { label: 'Gümüşlük', lat: 37.0548, lng: 27.2355, zoom: 15.6 },
+    { label: 'Fethiye', lat: 36.6215, lng: 29.1164, zoom: 15.4 },
+  ],
+  Hatay: [
+    { label: 'Antakya Çarşı', lat: 36.2028, lng: 36.1612, zoom: 15.8 },
+    { label: 'İskenderun', lat: 36.5870, lng: 36.1730, zoom: 15.3 },
+  ],
 };
 
 export const CITY_TABS: CityName[] = [

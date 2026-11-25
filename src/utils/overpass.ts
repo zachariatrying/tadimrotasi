@@ -121,8 +121,8 @@ function buildAddress(tags: Record<string, string>, fallbackDistrict: string, ci
 }
 
 function cellKey(bounds: MapBoundsBox): string {
-  const cLat = ((bounds.south + bounds.north) / 2).toFixed(2);
-  const cLng = ((bounds.west + bounds.east) / 2).toFixed(2);
+  const cLat = ((bounds.south + bounds.north) / 2).toFixed(3);
+  const cLng = ((bounds.west + bounds.east) / 2).toFixed(3);
   return `${cLat}:${cLng}`;
 }
 
@@ -216,7 +216,7 @@ export async function fetchLiveOsmVenuesInBounds(
   const latSpan = bounds.north - bounds.south;
   const lngSpan = bounds.east - bounds.west;
 
-  const maxSpan = 0.065;
+  const maxSpan = 0.09;
   const cLat = (bounds.south + bounds.north) / 2;
   const cLng = (bounds.west + bounds.east) / 2;
 

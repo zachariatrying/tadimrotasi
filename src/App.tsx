@@ -40,7 +40,7 @@ import { buildShareableListUrl, parseSharedListInput, readSharedListFromHash } f
 import { downloadTopTenStoryPng } from './utils/storyCard';
 import { fetchLiveOsmVenuesInBounds, type MapBoundsBox } from './utils/overpass';
 import { searchLiveTurkeyRestaurants } from './utils/geocoder';
-import { fetchQuickGoogleMapsThumb, getCachedVenueThumb } from './utils/pythonGmapsClient';
+import { fetchQuickGoogleMapsThumb, getCachedVenueThumb, wakePythonBackend } from './utils/pythonGmapsClient';
 import { calculateInAppRoute, type ActiveRouteData } from './utils/routingAndGeo';
 import {
   adminDeleteVenueInCloud,
@@ -93,12 +93,12 @@ type RailTab = 'discover' | 'ranked' | 'want' | 'friends';
 
 function VenueThumb({ venue, size = 'md', liveThumb }: { venue: Venue; size?: 'md' | 'sm'; liveThumb?: string }) {
   const realUrl = venue.googlePhotos?.[0] || liveThumb || getCachedVenueThumb(venue) || '';
-  const sizeCls = size === 'sm' ? 'w-10 h-10' : 'w-12 h-12';
+  const sizeCls = size === 'sm' ? 'w-11 h-11' : 'w-14 h-14';
 
   if (!realUrl) {
     return (
       <div
-        className={`${sizeCls} rounded-lg shrink-0 bg-[#EEF3F4] border border-[#DCE5E7] flex flex-col items-center justify-center text-[#0B4A4F] select-none`}
+        className={`${sizeCls} rounded-xl shrink-0 bg-gradient-to-br from-[#EAF4F4] to-[#D9ECEB] border border-[#DCE5E7] flex flex-col items-center justify-center text-[#0B4A4F] select-none`}
         title={venue.category}
       >
         <span className="text-xs font-extrabold leading-none">
@@ -113,7 +113,7 @@ function VenueThumb({ venue, size = 'md', liveThumb }: { venue: Venue; size?: 'm
       alt={venue.name}
       loading="lazy"
       referrerPolicy="no-referrer"
-      className={`${sizeCls} rounded-lg object-cover shrink-0 bg-[#E5ECEC]`}
+      className={`${sizeCls} rounded-xl object-cover shrink-0 bg-[#E5ECEC] ring-1 ring-black/5`}
     />
   );
 }
@@ -268,6 +268,12 @@ export default function App() {
       // Ignore storage quota errors
     }
   }, [state]);
+
+  useEffect(() => {
+    wakePythonBackend();
+  }, []);
+
+  const [listLimit, setListLimit] = useState(200);
 
   useEffect(() => {
     if (isSupabaseConfigured) {
@@ -460,6 +466,77 @@ export default function App() {
       }
     },
     [activeCity]
+  );
+
+  // Click any point on the map -> reverse geocode that exact POI and open it
+  const handlePickPoint = useCallback(
+    async (lat: number, lng: number) => {
+      setLiveOsmMsg('Tıklanan mekân aranıyor...');
+      try {
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?format=json&zoom=18&addressdetails=1&namedetails=1&accept-language=tr&lat=${lat}&lon=${lng}`
+        );
+        const j = (await res.json()) as {
+          name?: string;
+          type?: string;
+          category?: string;
+          address?: Record<string, string>;
+          lat?: string;
+          lon?: string;
+        };
+        const addr = j.address ?? {};
+        const name = (j.name || addr.amenity || addr.shop || '').trim();
+        if (!name) {
+          setLiveOsmMsg('Burada isimli bir mekân bulunamadı — bir etikete daha yakın tıkla');
+          return;
+        }
+        const city = (activeCity === 'Tüm Türkiye' ? 'İstanbul' : activeCity) as Venue['city'];
+        const district = addr.suburb || addr.city_district || addr.town || addr.county || city;
+        const vLat = Number(j.lat ?? lat);
+        const vLng = Number(j.lon ?? lng);
+        const existing = state.venues.find(
+          (v) => v.name.toLocaleLowerCase('tr-TR') === name.toLocaleLowerCase('tr-TR') && Math.abs(v.lat - vLat) < 0.003
+        );
+        if (existing) {
+          handleSelectVenue(existing.id);
+          setLiveOsmMsg(null);
+          return;
+        }
+        const t = `${name} ${j.type ?? ''}`.toLocaleLowerCase('tr-TR');
+        const category: VenueCategory = /cafe|kahve|coffee/.test(t)
+          ? '3. Nesil Kahve'
+          : /pastane|bakery|tatlı|baklava|ice_cream/.test(t)
+            ? 'Tatlı & Pastane'
+            : /kebap|döner|ocakbaşı/.test(t)
+              ? 'Döner & Ocakbaşı'
+              : /fast_food|büfe|dürüm/.test(t)
+                ? 'Sokak Lezzeti'
+                : /bar|pub|meyhane|balık/.test(t)
+                  ? 'Meyhane & Bistro'
+                  : 'Esnaf Lokantası';
+        const v: Venue = {
+          id: `v-pick-${vLat.toFixed(5)}-${vLng.toFixed(5)}`,
+          name,
+          city,
+          district,
+          category,
+          priceTier: '₺₺',
+          lat: Number(vLat.toFixed(5)),
+          lng: Number(vLng.toFixed(5)),
+          gpsVerified: true,
+          isLiveOsm: true,
+          address: [addr.road, addr.house_number, district].filter(Boolean).join(' '),
+          signatureDish: `${district} · Haritadan seçildi`,
+          sourcePlatform: 'OpenStreetMap',
+        };
+        setState((prev) => ({ ...prev, venues: [v, ...prev.venues] }));
+        handleSelectVenue(v.id);
+        setLiveOsmMsg(`“${name}” açıldı`);
+      } catch {
+        setLiveOsmMsg('Mekân bilgisi alınamadı');
+      }
+    },
+    [activeCity, state.venues, handleSelectVenue]
   );
 
   // Live all-Turkey restaurant search (Nominatim) when typing any real restaurant in Turkey
@@ -744,7 +821,7 @@ export default function App() {
   return (
     <div className="h-dvh flex flex-col overflow-hidden bg-white">
       {/* Committed Deep Bosphorus Teal Top Bar */}
-      <header className="h-14 shrink-0 bg-[#0B4A4F] text-white px-3 sm:px-4 flex items-center justify-between gap-3 border-b border-[#08393D]">
+      <header className="h-14 shrink-0 bg-gradient-to-r from-[#0B4A4F] via-[#0E5A60] to-[#0B4A4F] shadow-md relative z-10 text-white px-3 sm:px-4 flex items-center justify-between gap-3 border-b border-[#08393D]">
         <div className="flex items-center gap-2.5 shrink-0">
           <img src={`${import.meta.env.BASE_URL}store-assets/tadimrotasi_icon.png`} alt="TadımRotası" className="w-7 h-7 rounded-md object-cover" />
           <span className="text-base font-extrabold tracking-tight">TadımRotası</span>
@@ -855,7 +932,7 @@ export default function App() {
       )}
 
       {/* Compact Filter Bar (12 Cities + Categories) */}
-      <div className="shrink-0 bg-[#F5F7F8] border-b border-[#E4E8EB] px-3 sm:px-4 py-2 flex flex-wrap items-center gap-2">
+      <div className="shrink-0 bg-white/95 backdrop-blur border-b border-[#E4E8EB] px-3 sm:px-4 py-2 flex flex-wrap items-center gap-2 shadow-[0_1px_0_rgba(0,0,0,0.02)]">
         <div className="flex items-center gap-1 overflow-x-auto max-w-full" role="group" aria-label="Şehir seç">
           {CITY_TABS.map((city) => (
             <button
@@ -865,9 +942,9 @@ export default function App() {
                 setActiveCity(city);
                 setSelectedVenueId(null);
               }}
-              className={`shrink-0 rounded-md px-2.5 py-1 text-xs font-semibold transition-colors cursor-pointer ${activeCity === city
-                ? 'bg-[#0B4A4F] text-white'
-                : 'text-[#374151] hover:bg-[#E5ECEC]'
+              className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold transition-all cursor-pointer ${activeCity === city
+                ? 'bg-[#0B4A4F] text-white shadow-sm'
+                : 'text-[#374151] hover:bg-[#EEF4F4]'
                 }`}
             >
               {city}
@@ -883,7 +960,7 @@ export default function App() {
               key={cat}
               type="button"
               onClick={() => setActiveCategory(cat)}
-              className={`shrink-0 rounded-md border px-2.5 py-1 text-xs font-medium transition-colors cursor-pointer ${activeCategory === cat
+              className={`shrink-0 rounded-full border px-3 py-1 text-xs font-medium transition-all cursor-pointer ${activeCategory === cat
                 ? 'border-[#0B4A4F] bg-[#EAF4F4] text-[#0B4A4F] font-semibold'
                 : 'border-transparent bg-white text-[#4B5563] hover:border-[#D1D5DB]'
                 }`}
@@ -905,7 +982,7 @@ export default function App() {
               key={qp.id}
               type="button"
               onClick={() => setQuickPick((prev) => (prev === qp.id ? 'all' : qp.id))}
-              className={`shrink-0 rounded-md border px-2.5 py-1 text-xs font-bold transition-colors cursor-pointer ${quickPick === qp.id
+              className={`shrink-0 rounded-full border px-3 py-1 text-xs font-bold transition-all cursor-pointer ${quickPick === qp.id
                 ? 'border-[#D97706] bg-[#FEF3C7] text-[#92400E]'
                 : 'border-[#E5E7EB] bg-white text-[#374151] hover:border-[#D97706]'
                 }`}
@@ -1027,14 +1104,14 @@ export default function App() {
                           </button>
                         </div>
                       )}
-                      {visibleVenues.slice(0, 200).map((venue) => {
+                      {visibleVenues.slice(0, listLimit).map((venue) => {
                         const rank = rankMap.get(venue.id);
                         const isWant = wantSet.has(venue.id);
 
                         return (
                           <div
                             key={venue.id}
-                            className="px-3.5 py-2.5 flex items-center justify-between gap-2.5 hover:bg-[#F8FAFB] transition-colors"
+                            className="px-3.5 py-3 flex items-center justify-between gap-3 hover:bg-[#F3F8F8] transition-colors"
                           >
                             <button
                               type="button"
@@ -1100,6 +1177,17 @@ export default function App() {
                           </div>
                         );
                       })}
+                      {visibleVenues.length > listLimit && (
+                        <div className="p-3 text-center">
+                          <button
+                            type="button"
+                            onClick={() => setListLimit((n) => n + 200)}
+                            className="rounded-full border border-[#0B4A4F] px-4 py-1.5 text-xs font-bold text-[#0B4A4F] hover:bg-[#EAF4F4] cursor-pointer"
+                          >
+                            Daha Fazla Göster ({(visibleVenues.length - listLimit).toLocaleString('tr-TR')})
+                          </button>
+                        </div>
+                      )}
                     </>
                   ))}
 
@@ -1301,6 +1389,7 @@ export default function App() {
             onStartRoute={(v, mode) => void handleStartRoute(v, mode)}
             onClearRoute={() => setActiveRoute(null)}
             onFetchLiveArea={(bounds, force) => void handleFetchLiveArea(bounds, force)}
+            onPickPoint={(lat, lng) => void handlePickPoint(lat, lng)}
           />
         </main>
 

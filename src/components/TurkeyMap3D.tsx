@@ -27,7 +27,7 @@ import { CITY_CENTERS, CITY_NEIGHBORHOODS, type NeighborhoodHotspot } from '../d
 import { scoreColor } from '../utils/elo';
 import type { MapBoundsBox } from '../utils/overpass';
 import type { ActiveRouteData } from '../utils/routingAndGeo';
-import { getInstantVenuePhotos } from '../utils/venuePhotos';
+import { getCachedVenueThumb } from '../utils/pythonGmapsClient';
 import { fetchTerraceWeather, type TerraceWeatherInfo } from '../utils/terraceWeather';
 
 interface TurkeyMap3DProps {
@@ -45,15 +45,16 @@ interface TurkeyMap3DProps {
   onStartRoute: (venue: Venue, mode: 'driving' | 'walking') => void;
   onClearRoute: () => void;
   onFetchLiveArea: (bounds: MapBoundsBox, force?: boolean) => void;
+  onPickPoint?: (lat: number, lng: number) => void;
 }
 
 type MapStyleMode = 'apple3d' | 'night3d' | 'googleStreet' | 'googleSat' | 'organicTopo';
 
 const STYLE_LABELS: Record<MapStyleMode, string> = {
-  apple3d: 'Apple 3D',
-  night3d: 'Gece 3D',
-  googleStreet: 'Google Sokak',
-  googleSat: 'Google Uydu',
+  googleStreet: 'Google',
+  googleSat: 'Uydu',
+  apple3d: '3D Vektör',
+  night3d: 'Sade',
   organicTopo: 'Organic Topo',
 };
 
@@ -326,6 +327,7 @@ export function TurkeyMap3D({
   onStartRoute,
   onClearRoute,
   onFetchLiveArea,
+  onPickPoint,
 }: TurkeyMap3DProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
@@ -344,8 +346,10 @@ export function TurkeyMap3D({
   onSelectRef.current = onSelectVenue;
   const onFetchRef = useRef(onFetchLiveArea);
   onFetchRef.current = onFetchLiveArea;
+  const onPickRef = useRef(onPickPoint);
+  onPickRef.current = onPickPoint;
 
-  const [styleMode, setStyleMode] = useState<MapStyleMode>('apple3d');
+  const [styleMode, setStyleMode] = useState<MapStyleMode>('googleStreet');
   const [is3D, setIs3D] = useState(true);
   const [bearing, setBearing] = useState(-22);
   const [locating, setLocating] = useState(false);
@@ -388,7 +392,7 @@ export function TurkeyMap3D({
       type: 'geojson',
       data,
       cluster: true,
-      clusterMaxZoom: 12,
+      clusterMaxZoom: 11,
       clusterRadius: 42,
     });
 
@@ -499,7 +503,7 @@ export function TurkeyMap3D({
     const initial = CITY_CENTERS[city];
     const map = new maplibregl.Map({
       container: el,
-      style: getStyleSource('apple3d'),
+      style: getStyleSource('googleStreet'),
       center: [initial.lng, initial.lat],
       zoom: initial.zoom,
       pitch: 60,
@@ -523,7 +527,7 @@ export function TurkeyMap3D({
 
     const onStyleReady = () => {
       styleLoadedRef.current = true;
-      enhanceAppleStyle3D(map, 'apple3d');
+      enhanceAppleStyle3D(map, 'googleStreet');
       syncVenueLayers(map);
     };
 
@@ -534,7 +538,7 @@ export function TurkeyMap3D({
 
     // Auto-stream additional street restaurants when panning to any unharvested district
     map.on('moveend', () => {
-      if (map.getZoom() < 13.5) return;
+      if (map.getZoom() < 12.2) return;
       if (debounceRef.current) window.clearTimeout(debounceRef.current);
       debounceRef.current = window.setTimeout(() => {
         const b = map.getBounds();
@@ -548,6 +552,20 @@ export function TurkeyMap3D({
           false
         );
       }, 1100);
+    });
+
+    // Click any unpinned place on the Google map -> open/add that exact point
+    map.on('click', (e) => {
+      const layerIds = ['tr-clusters', 'tr-venues-dots', 'tr-venues-labels'].filter((id) => map.getLayer(id));
+      const hits = layerIds.length ? map.queryRenderedFeatures(e.point, { layers: layerIds }) : [];
+      if (hits.length > 0 || map.getZoom() < 14) return;
+      onPickRef.current?.(e.lngLat.lat, e.lngLat.lng);
+    });
+
+    // Initial live scan so the first neighborhood fills densely
+    map.once('idle', () => {
+      const b = map.getBounds();
+      onFetchRef.current({ south: b.getSouth(), west: b.getWest(), north: b.getNorth(), east: b.getEast() }, false);
     });
 
     const ro = new ResizeObserver(() => map.resize());
@@ -567,7 +585,7 @@ export function TurkeyMap3D({
   }, []);
 
   // Switch map engine (Apple 3D / Gece 3D / Google Sokak / Google Uydu / Organic Topo)
-  const prevStyleRef = useRef<MapStyleMode>('apple3d');
+  const prevStyleRef = useRef<MapStyleMode>('googleStreet');
   useEffect(() => {
     const map = mapRef.current;
     if (!map || prevStyleRef.current === styleMode) return;
@@ -789,7 +807,7 @@ export function TurkeyMap3D({
   };
 
   const hotspots = CITY_NEIGHBORHOODS[city] ?? [];
-  const selectedThumb = selectedVenue ? getInstantVenuePhotos(selectedVenue)[0] : null;
+  const selectedThumb = selectedVenue ? getCachedVenueThumb(selectedVenue) : null;
 
   return (
     <div className="relative w-full h-full bg-[#DCE4E8]">
@@ -817,7 +835,7 @@ export function TurkeyMap3D({
             className="shrink-0 inline-flex items-center gap-1 rounded-full bg-[#111827]/92 text-white px-3 py-1 text-[11px] font-bold shadow-md hover:bg-[#0B4A4F] cursor-pointer disabled:opacity-70"
           >
             <Radar className={`w-3 h-3 ${loadingLiveOsm ? 'animate-spin' : ''}`} />
-            {loadingLiveOsm ? 'Taranıyor...' : '+ Sokak Tara'}
+            {loadingLiveOsm ? 'Taranıyor...' : 'Bu Alanı Tara'}
           </button>
         </div>
 
@@ -874,7 +892,7 @@ export function TurkeyMap3D({
         <div className="hidden sm:flex absolute bottom-5 left-1/2 -translate-x-1/2 z-[25] w-[470px] max-w-[92%] rounded-xl border border-[#CBD5E1] bg-white/98 backdrop-blur-xs p-3 shadow-2xl items-center gap-3">
           {selectedThumb && (
             <img
-              src={selectedThumb.url}
+              src={selectedThumb}
               alt={selectedVenue.name}
               referrerPolicy="no-referrer"
               className="w-20 h-20 rounded-lg object-cover shrink-0 bg-[#E5ECEC]"

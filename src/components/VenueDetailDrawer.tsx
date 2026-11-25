@@ -89,7 +89,9 @@ export function VenueDetailDrawer({
   const [liveHours, setLiveHours] = useState<string | undefined>(venue.openingHours);
   const [lightboxIdx, setLightboxIdx] = useState<number | null>(null);
   const [terraceWeather, setTerraceWeather] = useState<TerraceWeatherInfo | null>(null);
-  const [heroTab, setHeroTab] = useState<'photos' | 'gmap' | 'sat'>('photos');
+  const [heroTab, setHeroTab] = useState<'photos' | 'gmap' | 'yandex' | 'sat'>(() =>
+    (venue.googlePhotos?.length ?? 0) > 0 ? 'photos' : 'yandex'
+  );
   const [pyGmaps, setPyGmaps] = useState<PythonGmapsInspection | null>(null);
   const [editingDetails, setEditingDetails] = useState(false);
   const [editName, setEditName] = useState(venue.name);
@@ -119,6 +121,7 @@ export function VenueDetailDrawer({
     setEditLng(String(venue.lng));
     setMismatchHint(null);
     setPyGmaps(null);
+    setHeroTab((venue.googlePhotos?.length ?? 0) > 0 ? 'photos' : 'yandex');
 
     void fetchTerraceWeather(venue.lat, venue.lng).then((w) => {
       if (active) setTerraceWeather(w);
@@ -154,6 +157,7 @@ export function VenueDetailDrawer({
           }
           return combined.slice(0, 16);
         });
+        setHeroTab('photos');
       }
       setLoadingPhotos(false);
 
@@ -184,11 +188,9 @@ export function VenueDetailDrawer({
 
     void resolveLiveVenueEnrichment(venue).then((enriched) => {
       if (!active) return;
-      const nonStockPhotos = enriched.photos.filter(
-        (p) => !p.url.includes('wikimedia.org')
-      );
-      if (nonStockPhotos.length > 0) {
-        setPhotos((prev) => (prev.length > 0 ? prev : nonStockPhotos));
+      if (enriched.photos.length > 0) {
+        setPhotos((prev) => (prev.length > 0 ? prev : enriched.photos));
+        setHeroTab('photos');
       }
       if (enriched.googleRating) setGoogleRating(enriched.googleRating);
       if (enriched.googleReviewCount) setGoogleReviewCount(enriched.googleReviewCount);
@@ -264,7 +266,7 @@ export function VenueDetailDrawer({
       {/* Scrollable Google Maps-Style Place Body */}
       <div className="flex-1 overflow-y-auto">
         {/* 3-Mode Media Switcher: Photos Collage | Live Interactive Google Maps Embed | Satellite Roof View */}
-        <div className="grid grid-cols-3 border-b border-[#E4E8EB] bg-[#F1F5F9] p-1 gap-1">
+        <div className="grid grid-cols-4 border-b border-[#E4E8EB] bg-[#F1F5F9] p-1 gap-1">
           <button
             type="button"
             onClick={() => setHeroTab('photos')}
@@ -274,7 +276,7 @@ export function VenueDetailDrawer({
               }`}
           >
             <Images className="w-3.5 h-3.5" />
-            Fotoğraflar ({photos.length})
+            Foto ({photos.length})
           </button>
           <button
             type="button"
@@ -285,7 +287,18 @@ export function VenueDetailDrawer({
               }`}
           >
             <MapIcon className="w-3.5 h-3.5" />
-            Canlı Google Harita
+            Google
+          </button>
+          <button
+            type="button"
+            onClick={() => setHeroTab('yandex')}
+            className={`inline-flex items-center justify-center gap-1 rounded-md py-1.5 text-[11px] font-extrabold cursor-pointer ${heroTab === 'yandex'
+              ? 'bg-[#0B4A4F] text-white shadow-xs'
+              : 'text-[#475569] hover:bg-white'
+              }`}
+          >
+            <MapPin className="w-3.5 h-3.5" />
+            Yandex
           </button>
           <button
             type="button"
@@ -296,7 +309,7 @@ export function VenueDetailDrawer({
               }`}
           >
             <Satellite className="w-3.5 h-3.5" />
-            Google Uydu
+            Uydu
           </button>
         </div>
 
@@ -309,7 +322,7 @@ export function VenueDetailDrawer({
                 <div className="text-xs font-semibold">
                   {loadingPhotos
                     ? 'Gerçek mekân fotoğrafları Google Haritalar’dan getiriliyor...'
-                    : 'Henüz gerçek mekân fotoğrafı bulunamadı. Google Harita veya Uydu sekmesinden inceleyebilirsiniz.'}
+                    : 'Bu mekânın Google fotoğrafı henüz alınamadı. Yandex veya Google sekmesinde gerçek mekân kartını görebilirsin.'}
                 </div>
               </div>
             ) : (
@@ -366,8 +379,23 @@ export function VenueDetailDrawer({
               {loadingPhotos ? 'Fotoğraflar güncelleniyor...' : `${photos.length} Fotoğraf`}
             </button>
           </div>
+        ) : heroTab === 'yandex' ? (
+          <div className="relative h-72 bg-[#E2E8F0] border-b border-[#E4E8EB]">
+            <iframe
+              title={`${venue.name} Yandex Haritalar`}
+              src={`https://yandex.com.tr/map-widget/v1/?text=${encodeURIComponent(
+                `${venue.name} ${venue.district} ${venue.city}`
+              )}&ll=${venue.lng},${venue.lat}&z=17&lang=tr_TR`}
+              className="w-full h-full border-0"
+              loading="lazy"
+              allowFullScreen
+            />
+            <span className="absolute bottom-2 left-2 rounded-md bg-white/95 px-2 py-1 text-[10px] font-bold text-[#111827] shadow">
+              {loadingPhotos ? 'Google fotoğrafları getiriliyor… Yandex kartında mekânın fotoğraf ve panoramalarına tıklayabilirsin' : 'Yandex kartında fotoğraf & panorama için mekâna tıkla'}
+            </span>
+          </div>
         ) : (
-          <div className="relative h-60 bg-[#E2E8F0] border-b border-[#E4E8EB]">
+          <div className="relative h-72 bg-[#E2E8F0] border-b border-[#E4E8EB]">
             <iframe
               title={`${venue.name} Google Maps`}
               src={

@@ -68,7 +68,7 @@ export async function inspectVenueViaPythonGmaps(venue: Venue): Promise<PythonGm
 
   try {
     const controller = new AbortController();
-    const timer = window.setTimeout(() => controller.abort(), 7500);
+    const timer = window.setTimeout(() => controller.abort(), 45000);
     const key = getSavedGoogleMapsKey();
     const params = new URLSearchParams({
       name: venue.name,
@@ -108,6 +108,11 @@ export async function inspectVenueViaPythonGmaps(venue: Venue): Promise<PythonGm
     embed_coord_url: defaultEmbedCoord,
     embed_streetview_url: defaultStreetView,
   };
+}
+
+/** Wake the Render free-tier backend as soon as the app opens (cold start ~50s). */
+export function wakePythonBackend(): void {
+  void fetch(`${PY_BACKEND}/api/gmaps/status`).catch(() => {});
 }
 
 const thumbMemoryCache = new Map<string, string>();

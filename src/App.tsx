@@ -1596,6 +1596,8 @@ export default function App() {
             onFetchLiveArea={(bounds, force) => void handleFetchLiveArea(bounds, force)}
             onPickPoint={(lat, lng) => void handlePickPoint(lat, lng)}
             userLocation={nearbyKm ? userLoc : null}
+            activeCategory={activeCategory}
+            onSelectCategory={setActiveCategory}
           />
         </main>
 
@@ -1611,7 +1613,7 @@ export default function App() {
             </>
           ) : (
             <>
-              <MapIcon className="w-4 h-4" /> 3D Haritayı Gör
+              <MapIcon className="w-4 h-4" /> Tadım 3D Harita
             </>
           )}
         </button>

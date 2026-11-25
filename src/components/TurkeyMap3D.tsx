@@ -22,8 +22,8 @@ import {
   Footprints,
   Sun,
 } from 'lucide-react';
-import type { CityName, RankedVenue, Venue } from '../types';
-import { CITY_CENTERS, CITY_NEIGHBORHOODS, type NeighborhoodHotspot } from '../data/venues';
+import type { CityName, RankedVenue, Venue, VenueCategory } from '../types';
+import { CITY_CENTERS, CITY_NEIGHBORHOODS, VENUE_CATEGORIES, type NeighborhoodHotspot } from '../data/venues';
 import { scoreColor } from '../utils/elo';
 import type { MapBoundsBox } from '../utils/overpass';
 import type { ActiveRouteData } from '../utils/routingAndGeo';
@@ -47,16 +47,18 @@ interface TurkeyMap3DProps {
   onFetchLiveArea: (bounds: MapBoundsBox, force?: boolean) => void;
   onPickPoint?: (lat: number, lng: number) => void;
   userLocation?: { lat: number; lng: number } | null;
+  activeCategory?: VenueCategory | 'Tümü';
+  onSelectCategory?: (cat: VenueCategory | 'Tümü') => void;
 }
 
 type MapStyleMode = 'apple3d' | 'night3d' | 'googleStreet' | 'googleSat' | 'organicTopo';
 
 const STYLE_LABELS: Record<MapStyleMode, string> = {
+  apple3d: 'Tadım 3D',
+  night3d: 'Gece 3D',
   googleStreet: 'Google',
   googleSat: 'Uydu',
-  apple3d: '3D Vektör',
-  night3d: 'Sade',
-  organicTopo: 'Organic Topo',
+  organicTopo: 'Topo',
 };
 
 function buildRasterStyle(
@@ -152,27 +154,81 @@ function getStyleSource(mode: MapStyleMode): string | StyleSpecification {
 }
 
 /**
- * Enhances OpenFreeMap vector styles with Apple Maps / Mapbox Standard 3D extruded buildings
- * and warm directional lighting across all 5 map modes.
+ * Enhances OpenFreeMap vector styles with bespoke TadımRotası "Tadım 3D" & "Gece 3D"
+ * cartography, sky atmosphere, warm limestone/Bosphorus 3D extruded buildings, and directional sun lighting.
  */
 function enhanceAppleStyle3D(map: maplibregl.Map, mode: MapStyleMode) {
   try {
     map.setLight({
       anchor: 'viewport',
-      color: mode === 'night3d' ? '#e2e8f0' : '#fffdf7',
-      intensity: 0.52,
-      position: [1.35, 215, 38],
+      color: mode === 'night3d' ? '#99F6E4' : '#FFF8EB',
+      intensity: mode === 'night3d' ? 0.42 : 0.58,
+      position: mode === 'night3d' ? [1.3, 200, 42] : [1.35, 210, 36],
     });
   } catch {
     // Ignore on restricted WebGL drivers
   }
 
+  if (mode === 'apple3d' || mode === 'night3d') {
+    try {
+      const skyMap = map as unknown as { setSky?: (sky: Record<string, unknown>) => void };
+      skyMap.setSky?.(
+        mode === 'night3d'
+          ? {
+              'sky-color': '#061821',
+              'sky-horizon-blend': 0.5,
+              'horizon-color': '#0E2E36',
+              'horizon-fog-blend': 0.6,
+              'fog-color': '#091E24',
+              'fog-ground-blend': 0.3,
+            }
+          : {
+              'sky-color': '#CBE7EE',
+              'sky-horizon-blend': 0.45,
+              'horizon-color': '#F8F4EC',
+              'horizon-fog-blend': 0.55,
+              'fog-color': '#F5F1E8',
+              'fog-ground-blend': 0.25,
+            }
+      );
+    } catch {
+      // Ignore if setSky is unsupported on current GPU
+    }
+  }
+
   const layers = map.getStyle()?.layers ?? [];
+
+  if (mode === 'apple3d' || mode === 'night3d') {
+    const isNight = mode === 'night3d';
+    for (const layer of layers) {
+      const id = layer.id.toLowerCase();
+      try {
+        if (layer.type === 'background') {
+          map.setPaintProperty(layer.id, 'background-color', isNight ? '#09181F' : '#F4F1EA');
+        } else if (layer.type === 'fill' && /water/.test(id)) {
+          map.setPaintProperty(layer.id, 'fill-color', isNight ? '#0B3B44' : '#8AD0D6');
+        } else if (layer.type === 'line' && /waterway/.test(id)) {
+          map.setPaintProperty(layer.id, 'line-color', isNight ? '#0E4A54' : '#74C2C9');
+        } else if (layer.type === 'fill' && /(park|wood|grass)/.test(id)) {
+          map.setPaintProperty(layer.id, 'fill-color', isNight ? '#0E2925' : '#DCEBD9');
+        } else if (layer.type === 'line' && /(road|highway|bridge|tunnel)/.test(id)) {
+          if (id.includes('casing')) {
+            map.setPaintProperty(layer.id, 'line-color', isNight ? '#132A33' : '#E2DDD3');
+          } else {
+            map.setPaintProperty(layer.id, 'line-color', isNight ? '#193641' : '#FFFFFF');
+          }
+        }
+      } catch {
+        // Ignore individual style layer mismatch
+      }
+    }
+  }
+
   const existing3d = layers.find((l) => l.id === 'building-3d');
 
   if (existing3d) {
     try {
-      map.setLayerZoomRange('building-3d', 13, 24);
+      map.setLayerZoomRange('building-3d', 12.6, 24);
       map.setPaintProperty('building-3d', 'fill-extrusion-height', [
         'max',
         ['coalesce', ['get', 'render_height'], 18],
@@ -193,24 +249,24 @@ function enhanceAppleStyle3D(map: maplibregl.Map, mode: MapStyleMode) {
                 ['linear'],
                 ['max', ['coalesce', ['get', 'render_height'], 18], 14],
                 0,
-                '#CBD5E1',
+                '#122B34',
                 25,
-                '#94A3B8',
+                '#183C47',
                 75,
-                '#64748B',
+                '#235764',
               ]
             : [
                 'interpolate',
                 ['linear'],
                 ['max', ['coalesce', ['get', 'render_height'], 18], 14],
                 0,
-                '#E7E2DA',
-                22,
-                '#D5DFEA',
-                60,
-                '#B8C9DC',
-                120,
-                '#9AB3CE',
+                '#EDE7DC',
+                20,
+                '#E2DDD2',
+                55,
+                '#C7D6DC',
+                110,
+                '#9BBAC4',
               ]
         );
         map.setPaintProperty('building-3d', 'fill-extrusion-opacity', 0.92);
@@ -235,23 +291,38 @@ function enhanceAppleStyle3D(map: maplibregl.Map, mode: MapStyleMode) {
           source: buildingFill.source as string,
           'source-layer': 'building',
           type: 'fill-extrusion',
-          minzoom: 13,
+          minzoom: 12.6,
           filter: ['!', ['has', 'hide_3d']],
           paint: {
-            'fill-extrusion-color': [
-              'interpolate',
-              ['linear'],
-              ['max', ['coalesce', ['get', 'render_height'], 18], 14],
-              0,
-              '#E2E8F0',
-              30,
-              '#CBD5E1',
-              80,
-              '#94A3B8',
-            ],
+            'fill-extrusion-color':
+              mode === 'night3d'
+                ? [
+                    'interpolate',
+                    ['linear'],
+                    ['max', ['coalesce', ['get', 'render_height'], 18], 14],
+                    0,
+                    '#122B34',
+                    25,
+                    '#183C47',
+                    75,
+                    '#235764',
+                  ]
+                : [
+                    'interpolate',
+                    ['linear'],
+                    ['max', ['coalesce', ['get', 'render_height'], 18], 14],
+                    0,
+                    '#EDE7DC',
+                    20,
+                    '#E2DDD2',
+                    55,
+                    '#C7D6DC',
+                    110,
+                    '#9BBAC4',
+                  ],
             'fill-extrusion-height': ['max', ['coalesce', ['get', 'render_height'], 18], 14],
             'fill-extrusion-base': ['coalesce', ['get', 'render_min_height'], 0],
-            'fill-extrusion-opacity': 0.9,
+            'fill-extrusion-opacity': 0.92,
             'fill-extrusion-vertical-gradient': true,
           },
         },
@@ -330,6 +401,8 @@ export function TurkeyMap3D({
   onFetchLiveArea,
   onPickPoint,
   userLocation,
+  activeCategory,
+  onSelectCategory,
 }: TurkeyMap3DProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
@@ -351,7 +424,9 @@ export function TurkeyMap3D({
   const onPickRef = useRef(onPickPoint);
   onPickRef.current = onPickPoint;
 
-  const [styleMode, setStyleMode] = useState<MapStyleMode>('googleStreet');
+  const [styleMode, setStyleMode] = useState<MapStyleMode>('apple3d');
+  const styleModeRef = useRef<MapStyleMode>('apple3d');
+  styleModeRef.current = styleMode;
   const [is3D, setIs3D] = useState(true);
   const [bearing, setBearing] = useState(-22);
   const [locating, setLocating] = useState(false);
@@ -378,14 +453,23 @@ export function TurkeyMap3D({
     };
   }, [selectedVenue]);
 
-  const syncVenueLayers = (map: maplibregl.Map) => {
+  const syncVenueLayers = (map: maplibregl.Map, activeMode: MapStyleMode = styleModeRef.current) => {
     const rankMap = new Map(rankedRef.current.map((r) => [r.venueId, r]));
     const wantSet = new Set(wantRef.current);
     const data = buildVenuesGeoJson(visibleVenuesRef.current, rankMap, wantSet);
+    const isDarkTextBg = activeMode === 'googleSat' || activeMode === 'night3d';
 
     const existing = map.getSource('tr-venues') as maplibregl.GeoJSONSource | undefined;
     if (existing) {
       existing.setData(data);
+      if (map.getLayer('tr-venues-labels')) {
+        map.setPaintProperty('tr-venues-labels', 'text-color', isDarkTextBg ? '#FFFFFF' : '#0F172A');
+        map.setPaintProperty(
+          'tr-venues-labels',
+          'text-halo-color',
+          isDarkTextBg ? 'rgba(9, 24, 31, 0.94)' : 'rgba(255, 255, 255, 0.96)'
+        );
+      }
       return;
     }
 
@@ -407,7 +491,7 @@ export function TurkeyMap3D({
       paint: {
         'circle-color': '#0B4A4F',
         'circle-radius': ['step', ['get', 'point_count'], 18, 40, 22, 150, 27],
-        'circle-stroke-width': 2.5,
+        'circle-stroke-width': 3,
         'circle-stroke-color': '#FFFFFF',
       },
     });
@@ -427,6 +511,20 @@ export function TurkeyMap3D({
       },
     });
 
+    // Ambient outer halo under gastronomy pins
+    map.addLayer({
+      id: 'tr-venues-glow',
+      type: 'circle',
+      source: 'tr-venues',
+      filter: ['!', ['has', 'point_count']],
+      paint: {
+        'circle-radius': ['interpolate', ['linear'], ['zoom'], 11, 9, 14, 13, 16.5, 17],
+        'circle-color': ['get', 'color'],
+        'circle-opacity': 0.22,
+        'circle-blur': 0.65,
+      },
+    });
+
     // Individual restaurant pins (color-coded by category)
     map.addLayer({
       id: 'tr-venues-dots',
@@ -434,9 +532,13 @@ export function TurkeyMap3D({
       source: 'tr-venues',
       filter: ['!', ['has', 'point_count']],
       paint: {
-        'circle-radius': ['interpolate', ['linear'], ['zoom'], 11, 5, 14, 7.5, 16.5, 9.5],
+        'circle-radius': [
+          '+',
+          ['interpolate', ['linear'], ['zoom'], 11, 5, 14, 7.5, 16.5, 9.5],
+          ['case', ['==', ['get', 'isWant'], 1], 2, 0],
+        ],
         'circle-color': ['get', 'color'],
-        'circle-stroke-width': 2.2,
+        'circle-stroke-width': 2.5,
         'circle-stroke-color': '#FFFFFF',
       },
     });
@@ -458,9 +560,8 @@ export function TurkeyMap3D({
         'text-optional': true,
       },
       paint: {
-        'text-color': styleMode === 'googleSat' ? '#FFFFFF' : '#0F172A',
-        'text-halo-color':
-          styleMode === 'googleSat' ? 'rgba(15,23,42,0.95)' : 'rgba(255,255,255,0.96)',
+        'text-color': isDarkTextBg ? '#FFFFFF' : '#0F172A',
+        'text-halo-color': isDarkTextBg ? 'rgba(9, 24, 31, 0.94)' : 'rgba(255, 255, 255, 0.96)',
         'text-halo-width': 1.8,
       },
     });
@@ -505,7 +606,7 @@ export function TurkeyMap3D({
     const initial = CITY_CENTERS[city];
     const map = new maplibregl.Map({
       container: el,
-      style: getStyleSource('googleStreet'),
+      style: getStyleSource('apple3d'),
       center: [initial.lng, initial.lat],
       zoom: initial.zoom,
       pitch: 60,
@@ -529,8 +630,8 @@ export function TurkeyMap3D({
 
     const onStyleReady = () => {
       styleLoadedRef.current = true;
-      enhanceAppleStyle3D(map, 'googleStreet');
-      syncVenueLayers(map);
+      enhanceAppleStyle3D(map, 'apple3d');
+      syncVenueLayers(map, 'apple3d');
     };
 
     map.on('style.load', onStyleReady);
@@ -586,8 +687,8 @@ export function TurkeyMap3D({
     };
   }, []);
 
-  // Switch map engine (Apple 3D / Gece 3D / Google Sokak / Google Uydu / Organic Topo)
-  const prevStyleRef = useRef<MapStyleMode>('googleStreet');
+  // Switch map engine (Tadım 3D / Gece 3D / Google / Uydu / Topo)
+  const prevStyleRef = useRef<MapStyleMode>('apple3d');
   useEffect(() => {
     const map = mapRef.current;
     if (!map || prevStyleRef.current === styleMode) return;
@@ -598,7 +699,7 @@ export function TurkeyMap3D({
     map.once('style.load', () => {
       styleLoadedRef.current = true;
       enhanceAppleStyle3D(map, styleMode);
-      syncVenueLayers(map);
+      syncVenueLayers(map, styleMode);
     });
   }, [styleMode]);
 
@@ -1059,6 +1160,40 @@ export function TurkeyMap3D({
             <Minus className="w-4 h-4" />
           </button>
         </div>
+      </div>
+
+      {/* Bottom-Left: Interactive Tadım 3D Gastronomy Category Legend */}
+      <div className="hidden md:flex absolute bottom-9 left-3 z-[20] items-center gap-1 rounded-full bg-white/92 backdrop-blur-xs border border-[#D1D5DB] px-2.5 py-1 shadow-md max-w-[calc(100%-160px)] overflow-x-auto">
+        {VENUE_CATEGORIES.map((cat) => {
+          const active = activeCategory === cat;
+          const shortLabel = cat
+            .replace('Esnaf Lokantası', 'Esnaf')
+            .replace('Döner & Ocakbaşı', 'Ocakbaşı')
+            .replace('3. Nesil Kahve', 'Kahve')
+            .replace('Meyhane & Bistro', 'Meyhane')
+            .replace('Kahvaltı & Fırın', 'Kahvaltı')
+            .replace('Tatlı & Pastane', 'Tatlı')
+            .replace('Sokak Lezzeti', 'Sokak');
+          return (
+            <button
+              key={cat}
+              type="button"
+              onClick={() => onSelectCategory?.(active ? 'Tümü' : cat)}
+              title={cat}
+              className={`shrink-0 inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-bold transition-colors cursor-pointer ${
+                active
+                  ? 'bg-[#0B4A4F] text-white'
+                  : 'text-[#334155] hover:bg-[#F1F5F9]'
+              }`}
+            >
+              <span
+                className="w-2 h-2 rounded-full shrink-0 border border-white/80"
+                style={{ backgroundColor: categoryColor(cat, false) }}
+              />
+              {shortLabel}
+            </button>
+          );
+        })}
       </div>
     </div>
   );

@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client';
 import './index.css';
 import App from './App';
 
-const BUILD_VERSION = 'tadimrotasi-v5.0';
+const BUILD_VERSION = 'tadimrotasi-v5.5';
 
 // Automatically purge stale Service Workers & old caches so localhost preview always loads fresh
 if ('serviceWorker' in navigator) {

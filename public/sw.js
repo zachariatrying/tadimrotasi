@@ -1,4 +1,4 @@
-const CACHE_NAME = 'tadimrotasi-v5';
+const CACHE_NAME = 'tadimrotasi-v5.5';
 
 self.addEventListener('install', () => {
   self.skipWaiting();
@@ -13,5 +13,11 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
-  event.respondWith(fetch(event.request).catch(() => caches.match(event.request)));
+  const url = new URL(event.request.url);
+  if (url.origin !== self.location.origin) return;
+  event.respondWith(
+    fetch(event.request).catch(() =>
+      caches.match(event.request).then((r) => r || Response.error())
+    )
+  );
 });

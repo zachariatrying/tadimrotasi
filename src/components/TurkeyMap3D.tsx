@@ -61,6 +61,288 @@ const STYLE_LABELS: Record<MapStyleMode, string> = {
   organicTopo: 'Topo',
 };
 
+const CARTO_VECTOR_TILES = [
+  'https://tiles-a.basemaps.cartocdn.com/vectortiles/carto.streets/v1/{z}/{x}/{y}.mvt',
+  'https://tiles-b.basemaps.cartocdn.com/vectortiles/carto.streets/v1/{z}/{x}/{y}.mvt',
+  'https://tiles-c.basemaps.cartocdn.com/vectortiles/carto.streets/v1/{z}/{x}/{y}.mvt',
+  'https://tiles-d.basemaps.cartocdn.com/vectortiles/carto.streets/v1/{z}/{x}/{y}.mvt',
+];
+const CARTO_GLYPHS = 'https://tiles.basemaps.cartocdn.com/fonts/{fontstack}/{range}.pbf';
+
+function buildTadimVectorStyle(isNight: boolean): StyleSpecification {
+  return {
+    version: 8,
+    glyphs: CARTO_GLYPHS,
+    sources: {
+      'carto-vector': {
+        type: 'vector',
+        tiles: CARTO_VECTOR_TILES,
+        minzoom: 0,
+        maxzoom: 14,
+        attribution: '&copy; OpenStreetMap &copy; CARTO',
+      },
+    },
+    layers: [
+      {
+        id: 'bg',
+        type: 'background',
+        paint: { 'background-color': isNight ? '#09181F' : '#F4F1EA' },
+      },
+      {
+        id: 'landuse-res',
+        type: 'fill',
+        source: 'carto-vector',
+        'source-layer': 'landuse',
+        filter: ['in', 'class', 'residential', 'suburb', 'neighbourhood'],
+        paint: {
+          'fill-color': isNight ? '#0C1E26' : '#EFECE4',
+          'fill-opacity': 0.7,
+        },
+      },
+      {
+        id: 'landcover-green',
+        type: 'fill',
+        source: 'carto-vector',
+        'source-layer': 'landcover',
+        filter: ['in', 'class', 'grass', 'wood'],
+        paint: {
+          'fill-color': isNight ? '#0E2925' : '#DCEBD9',
+          'fill-opacity': 0.85,
+        },
+      },
+      {
+        id: 'park-fill',
+        type: 'fill',
+        source: 'carto-vector',
+        'source-layer': 'park',
+        paint: {
+          'fill-color': isNight ? '#0F2E29' : '#D4E8D0',
+          'fill-opacity': 0.88,
+        },
+      },
+      {
+        id: 'water-fill',
+        type: 'fill',
+        source: 'carto-vector',
+        'source-layer': 'water',
+        paint: {
+          'fill-color': isNight ? '#0B3B44' : '#82CED6',
+        },
+      },
+      {
+        id: 'road-casing-minor',
+        type: 'line',
+        source: 'carto-vector',
+        'source-layer': 'transportation',
+        minzoom: 12,
+        filter: ['in', 'class', 'minor', 'service', 'street'],
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: {
+          'line-color': isNight ? '#132A33' : '#E2DDD3',
+          'line-width': ['interpolate', ['linear'], ['zoom'], 12, 1.5, 15, 5, 18, 11],
+        },
+      },
+      {
+        id: 'road-casing-major',
+        type: 'line',
+        source: 'carto-vector',
+        'source-layer': 'transportation',
+        filter: ['in', 'class', 'motorway', 'trunk', 'primary', 'secondary', 'tertiary'],
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: {
+          'line-color': isNight ? '#15323D' : '#D6CFC2',
+          'line-width': ['interpolate', ['linear'], ['zoom'], 6, 1, 12, 3.5, 15, 8.5, 18, 17],
+        },
+      },
+      {
+        id: 'road-pedestrian',
+        type: 'line',
+        source: 'carto-vector',
+        'source-layer': 'transportation',
+        minzoom: 14,
+        filter: ['==', 'class', 'path'],
+        paint: {
+          'line-color': isNight ? '#1B3A46' : '#E6DFD3',
+          'line-dasharray': [2, 1.5],
+          'line-width': ['interpolate', ['linear'], ['zoom'], 14, 1.2, 17, 2.8],
+        },
+      },
+      {
+        id: 'road-fill-minor',
+        type: 'line',
+        source: 'carto-vector',
+        'source-layer': 'transportation',
+        minzoom: 12,
+        filter: ['in', 'class', 'minor', 'service', 'street'],
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: {
+          'line-color': isNight ? '#193641' : '#FFFFFF',
+          'line-width': ['interpolate', ['linear'], ['zoom'], 12, 0.9, 15, 3.6, 18, 8.5],
+        },
+      },
+      {
+        id: 'road-fill-major',
+        type: 'line',
+        source: 'carto-vector',
+        'source-layer': 'transportation',
+        filter: ['in', 'class', 'primary', 'secondary', 'tertiary'],
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: {
+          'line-color': isNight ? '#1F4452' : '#FFFDF9',
+          'line-width': ['interpolate', ['linear'], ['zoom'], 8, 0.8, 12, 2.4, 15, 6.5, 18, 14],
+        },
+      },
+      {
+        id: 'road-fill-highway',
+        type: 'line',
+        source: 'carto-vector',
+        'source-layer': 'transportation',
+        filter: ['in', 'class', 'motorway', 'trunk'],
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: {
+          'line-color': isNight ? '#245363' : '#FDE6B8',
+          'line-width': ['interpolate', ['linear'], ['zoom'], 6, 0.9, 12, 3, 15, 7.5, 18, 15],
+        },
+      },
+      {
+        id: 'boundary-country',
+        type: 'line',
+        source: 'carto-vector',
+        'source-layer': 'boundary',
+        filter: ['==', 'admin_level', 2],
+        paint: {
+          'line-color': isNight ? '#335C67' : '#94A3B8',
+          'line-width': 1.2,
+          'line-dasharray': [3, 2],
+        },
+      },
+      {
+        id: 'building-2d',
+        type: 'fill',
+        source: 'carto-vector',
+        'source-layer': 'building',
+        minzoom: 12,
+        maxzoom: 12.8,
+        paint: {
+          'fill-color': isNight ? '#112730' : '#E7E1D6',
+          'fill-opacity': 0.7,
+        },
+      },
+      {
+        id: 'building-3d',
+        type: 'fill-extrusion',
+        source: 'carto-vector',
+        'source-layer': 'building',
+        minzoom: 12.6,
+        paint: {
+          'fill-extrusion-height': ['max', ['coalesce', ['get', 'render_height'], 16], 12],
+          'fill-extrusion-base': ['coalesce', ['get', 'render_min_height'], 0],
+          'fill-extrusion-color': isNight
+            ? [
+                'interpolate',
+                ['linear'],
+                ['max', ['coalesce', ['get', 'render_height'], 16], 12],
+                0,
+                '#122B34',
+                25,
+                '#183C47',
+                75,
+                '#235764',
+              ]
+            : [
+                'interpolate',
+                ['linear'],
+                ['max', ['coalesce', ['get', 'render_height'], 16], 12],
+                0,
+                '#EDE7DC',
+                20,
+                '#E2DDD2',
+                55,
+                '#C7D6DC',
+                110,
+                '#9BBAC4',
+              ],
+          'fill-extrusion-opacity': 0.92,
+          'fill-extrusion-vertical-gradient': true,
+        },
+      },
+      {
+        id: 'water-label',
+        type: 'symbol',
+        source: 'carto-vector',
+        'source-layer': 'water_name',
+        minzoom: 8,
+        layout: {
+          'text-field': ['coalesce', ['get', 'name:tr'], ['get', 'name'], ['get', 'name:latin']],
+          'text-font': ['Open Sans Italic', 'Noto Sans Regular'],
+          'text-size': 12,
+        },
+        paint: {
+          'text-color': isNight ? '#5EEAD4' : '#0E626D',
+          'text-halo-color': isNight ? 'rgba(9,24,31,0.85)' : 'rgba(255,255,255,0.85)',
+          'text-halo-width': 1.4,
+        },
+      },
+      {
+        id: 'road-label',
+        type: 'symbol',
+        source: 'carto-vector',
+        'source-layer': 'transportation_name',
+        minzoom: 13,
+        layout: {
+          'symbol-placement': 'line',
+          'text-field': ['coalesce', ['get', 'name:tr'], ['get', 'name'], ['get', 'name:latin']],
+          'text-font': ['Open Sans Bold', 'Noto Sans Regular'],
+          'text-size': ['interpolate', ['linear'], ['zoom'], 13, 10, 16, 11.5],
+        },
+        paint: {
+          'text-color': isNight ? '#94B8C2' : '#475569',
+          'text-halo-color': isNight ? 'rgba(9,24,31,0.9)' : 'rgba(255,255,255,0.92)',
+          'text-halo-width': 1.6,
+        },
+      },
+      {
+        id: 'place-neighbourhood',
+        type: 'symbol',
+        source: 'carto-vector',
+        'source-layer': 'place',
+        minzoom: 11.5,
+        filter: ['in', 'class', 'suburb', 'quarter', 'neighbourhood'],
+        layout: {
+          'text-field': ['coalesce', ['get', 'name:tr'], ['get', 'name'], ['get', 'name:latin']],
+          'text-font': ['Open Sans Bold', 'Noto Sans Regular'],
+          'text-transform': 'uppercase',
+          'text-letter-spacing': 0.08,
+          'text-size': ['interpolate', ['linear'], ['zoom'], 12, 10, 15, 11.5],
+        },
+        paint: {
+          'text-color': isNight ? '#67A3B0' : '#5B6B73',
+          'text-halo-color': isNight ? 'rgba(9,24,31,0.92)' : 'rgba(244,241,234,0.95)',
+          'text-halo-width': 1.8,
+        },
+      },
+      {
+        id: 'place-city',
+        type: 'symbol',
+        source: 'carto-vector',
+        'source-layer': 'place',
+        maxzoom: 14,
+        filter: ['in', 'class', 'city', 'town'],
+        layout: {
+          'text-field': ['coalesce', ['get', 'name:tr'], ['get', 'name'], ['get', 'name:latin']],
+          'text-font': ['Open Sans Bold', 'Noto Sans Regular'],
+          'text-size': ['interpolate', ['linear'], ['zoom'], 5, 11, 10, 14, 13, 16],
+        },
+        paint: {
+          'text-color': isNight ? '#E2F1F4' : '#0F172A',
+          'text-halo-color': isNight ? 'rgba(9,24,31,0.95)' : 'rgba(255,255,255,0.95)',
+          'text-halo-width': 2,
+        },
+      },
+    ],
+  };
+}
+
 function buildRasterStyle(
   tileUrl: string,
   attribution: string,
@@ -69,7 +351,7 @@ function buildRasterStyle(
 ): StyleSpecification {
   return {
     version: 8,
-    glyphs: 'https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf',
+    glyphs: CARTO_GLYPHS,
     sources: {
       'raster-base': {
         type: 'raster',
@@ -77,9 +359,11 @@ function buildRasterStyle(
         tileSize: 256,
         attribution,
       },
-      openmaptiles: {
+      'carto-vector': {
         type: 'vector',
-        url: 'https://tiles.openfreemap.org/planet',
+        tiles: CARTO_VECTOR_TILES,
+        minzoom: 0,
+        maxzoom: 14,
       },
     },
     layers: [
@@ -88,10 +372,9 @@ function buildRasterStyle(
       {
         id: 'building-3d',
         type: 'fill-extrusion',
-        source: 'openmaptiles',
+        source: 'carto-vector',
         'source-layer': 'building',
         minzoom: 13,
-        filter: ['!', ['has', 'hide_3d']],
         paint: {
           'fill-extrusion-color': isSatellite
             ? [
@@ -126,13 +409,13 @@ function buildRasterStyle(
   };
 }
 
-function getStyleSource(mode: MapStyleMode): string | StyleSpecification {
-  if (mode === 'apple3d') return 'https://tiles.openfreemap.org/styles/liberty';
-  if (mode === 'night3d') return 'https://tiles.openfreemap.org/styles/positron';
+function getStyleSource(mode: MapStyleMode): StyleSpecification {
+  if (mode === 'apple3d') return buildTadimVectorStyle(false);
+  if (mode === 'night3d') return buildTadimVectorStyle(true);
   if (mode === 'googleStreet') {
     return buildRasterStyle(
       'https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}&hl=tr',
-      '&copy; Google Maps &middot; 3D Binalar: OpenMapTiles',
+      '&copy; Google Maps &middot; 3D Binalar: CARTO',
       '#F1F5F9',
       false
     );
@@ -140,7 +423,7 @@ function getStyleSource(mode: MapStyleMode): string | StyleSpecification {
   if (mode === 'googleSat') {
     return buildRasterStyle(
       'https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}&hl=tr',
-      '&copy; Google Hybrid Satellite &middot; 3D Binalar: OpenMapTiles',
+      '&copy; Google Hybrid Satellite &middot; 3D Binalar: CARTO',
       '#0F172A',
       true
     );
@@ -154,8 +437,7 @@ function getStyleSource(mode: MapStyleMode): string | StyleSpecification {
 }
 
 /**
- * Enhances OpenFreeMap vector styles with bespoke TadımRotası "Tadım 3D" & "Gece 3D"
- * cartography, sky atmosphere, warm limestone/Bosphorus 3D extruded buildings, and directional sun lighting.
+ * Applies TadımRotası directional sun/moon lighting and sky horizon atmosphere.
  */
 function enhanceAppleStyle3D(map: maplibregl.Map, mode: MapStyleMode) {
   try {
@@ -180,7 +462,7 @@ function enhanceAppleStyle3D(map: maplibregl.Map, mode: MapStyleMode) {
               'horizon-color': '#0E2E36',
               'horizon-fog-blend': 0.6,
               'fog-color': '#091E24',
-              'fog-ground-blend': 0.3,
+              'fog-ground-blend': 0.82,
             }
           : {
               'sky-color': '#CBE7EE',
@@ -188,148 +470,11 @@ function enhanceAppleStyle3D(map: maplibregl.Map, mode: MapStyleMode) {
               'horizon-color': '#F8F4EC',
               'horizon-fog-blend': 0.55,
               'fog-color': '#F5F1E8',
-              'fog-ground-blend': 0.25,
+              'fog-ground-blend': 0.82,
             }
       );
     } catch {
       // Ignore if setSky is unsupported on current GPU
-    }
-  }
-
-  const layers = map.getStyle()?.layers ?? [];
-
-  if (mode === 'apple3d' || mode === 'night3d') {
-    const isNight = mode === 'night3d';
-    for (const layer of layers) {
-      const id = layer.id.toLowerCase();
-      try {
-        if (layer.type === 'background') {
-          map.setPaintProperty(layer.id, 'background-color', isNight ? '#09181F' : '#F4F1EA');
-        } else if (layer.type === 'fill' && /water/.test(id)) {
-          map.setPaintProperty(layer.id, 'fill-color', isNight ? '#0B3B44' : '#8AD0D6');
-        } else if (layer.type === 'line' && /waterway/.test(id)) {
-          map.setPaintProperty(layer.id, 'line-color', isNight ? '#0E4A54' : '#74C2C9');
-        } else if (layer.type === 'fill' && /(park|wood|grass)/.test(id)) {
-          map.setPaintProperty(layer.id, 'fill-color', isNight ? '#0E2925' : '#DCEBD9');
-        } else if (layer.type === 'line' && /(road|highway|bridge|tunnel)/.test(id)) {
-          if (id.includes('casing')) {
-            map.setPaintProperty(layer.id, 'line-color', isNight ? '#132A33' : '#E2DDD3');
-          } else {
-            map.setPaintProperty(layer.id, 'line-color', isNight ? '#193641' : '#FFFFFF');
-          }
-        }
-      } catch {
-        // Ignore individual style layer mismatch
-      }
-    }
-  }
-
-  const existing3d = layers.find((l) => l.id === 'building-3d');
-
-  if (existing3d) {
-    try {
-      map.setLayerZoomRange('building-3d', 12.6, 24);
-      map.setPaintProperty('building-3d', 'fill-extrusion-height', [
-        'max',
-        ['coalesce', ['get', 'render_height'], 18],
-        14,
-      ]);
-      map.setPaintProperty('building-3d', 'fill-extrusion-base', [
-        'coalesce',
-        ['get', 'render_min_height'],
-        0,
-      ]);
-      if (mode === 'apple3d' || mode === 'night3d') {
-        map.setPaintProperty(
-          'building-3d',
-          'fill-extrusion-color',
-          mode === 'night3d'
-            ? [
-                'interpolate',
-                ['linear'],
-                ['max', ['coalesce', ['get', 'render_height'], 18], 14],
-                0,
-                '#122B34',
-                25,
-                '#183C47',
-                75,
-                '#235764',
-              ]
-            : [
-                'interpolate',
-                ['linear'],
-                ['max', ['coalesce', ['get', 'render_height'], 18], 14],
-                0,
-                '#EDE7DC',
-                20,
-                '#E2DDD2',
-                55,
-                '#C7D6DC',
-                110,
-                '#9BBAC4',
-              ]
-        );
-        map.setPaintProperty('building-3d', 'fill-extrusion-opacity', 0.92);
-      }
-      map.setPaintProperty('building-3d', 'fill-extrusion-vertical-gradient', true);
-    } catch {
-      // Ignore paint property race
-    }
-    return;
-  }
-
-  const buildingFill = layers.find((l) => l.id === 'building' && 'source' in l);
-  if (buildingFill && 'source' in buildingFill && buildingFill.source) {
-    const labelLayerId = layers.find(
-      (l) => l.type === 'symbol' && l.layout && 'text-field' in l.layout
-    )?.id;
-
-    try {
-      map.addLayer(
-        {
-          id: 'apple-3d-buildings',
-          source: buildingFill.source as string,
-          'source-layer': 'building',
-          type: 'fill-extrusion',
-          minzoom: 12.6,
-          filter: ['!', ['has', 'hide_3d']],
-          paint: {
-            'fill-extrusion-color':
-              mode === 'night3d'
-                ? [
-                    'interpolate',
-                    ['linear'],
-                    ['max', ['coalesce', ['get', 'render_height'], 18], 14],
-                    0,
-                    '#122B34',
-                    25,
-                    '#183C47',
-                    75,
-                    '#235764',
-                  ]
-                : [
-                    'interpolate',
-                    ['linear'],
-                    ['max', ['coalesce', ['get', 'render_height'], 18], 14],
-                    0,
-                    '#EDE7DC',
-                    20,
-                    '#E2DDD2',
-                    55,
-                    '#C7D6DC',
-                    110,
-                    '#9BBAC4',
-                  ],
-            'fill-extrusion-height': ['max', ['coalesce', ['get', 'render_height'], 18], 14],
-            'fill-extrusion-base': ['coalesce', ['get', 'render_min_height'], 0],
-            'fill-extrusion-opacity': 0.92,
-            'fill-extrusion-vertical-gradient': true,
-          },
-        },
-        labelLayerId
-      );
-    } catch {
-      // Ignore if already present
     }
   }
 }
@@ -503,7 +648,7 @@ export function TurkeyMap3D({
       filter: ['has', 'point_count'],
       layout: {
         'text-field': ['get', 'point_count_abbreviated'],
-        'text-font': ['Noto Sans Bold'],
+        'text-font': ['Open Sans Bold', 'Noto Sans Regular'],
         'text-size': 12,
       },
       paint: {
@@ -533,9 +678,15 @@ export function TurkeyMap3D({
       filter: ['!', ['has', 'point_count']],
       paint: {
         'circle-radius': [
-          '+',
-          ['interpolate', ['linear'], ['zoom'], 11, 5, 14, 7.5, 16.5, 9.5],
-          ['case', ['==', ['get', 'isWant'], 1], 2, 0],
+          'interpolate',
+          ['linear'],
+          ['zoom'],
+          11,
+          ['case', ['==', ['get', 'isWant'], 1], 7, 5],
+          14,
+          ['case', ['==', ['get', 'isWant'], 1], 9.5, 7.5],
+          16.5,
+          ['case', ['==', ['get', 'isWant'], 1], 11.5, 9.5],
         ],
         'circle-color': ['get', 'color'],
         'circle-stroke-width': 2.5,
@@ -552,7 +703,7 @@ export function TurkeyMap3D({
       minzoom: 13.2,
       layout: {
         'text-field': ['get', 'label'],
-        'text-font': ['Noto Sans Bold'],
+        'text-font': ['Open Sans Bold', 'Noto Sans Regular'],
         'text-size': ['interpolate', ['linear'], ['zoom'], 13.2, 10.5, 16, 12],
         'text-offset': [0, 1.05],
         'text-anchor': 'top',
@@ -630,12 +781,11 @@ export function TurkeyMap3D({
 
     const onStyleReady = () => {
       styleLoadedRef.current = true;
-      enhanceAppleStyle3D(map, 'apple3d');
-      syncVenueLayers(map, 'apple3d');
+      enhanceAppleStyle3D(map, styleModeRef.current);
+      syncVenueLayers(map, styleModeRef.current);
     };
 
     map.on('style.load', onStyleReady);
-    map.on('load', onStyleReady);
     map.on('rotate', () => setBearing(Math.round(map.getBearing())));
     map.on('pitchend', () => setIs3D(map.getPitch() > 15));
 
@@ -696,11 +846,6 @@ export function TurkeyMap3D({
     styleLoadedRef.current = false;
 
     map.setStyle(getStyleSource(styleMode));
-    map.once('style.load', () => {
-      styleLoadedRef.current = true;
-      enhanceAppleStyle3D(map, styleMode);
-      syncVenueLayers(map, styleMode);
-    });
   }, [styleMode]);
 
   // Smooth 3D flyTo when switching cities
@@ -930,7 +1075,7 @@ export function TurkeyMap3D({
   const selectedThumb = selectedVenue ? getCachedVenueThumb(selectedVenue) : null;
 
   return (
-    <div className="relative w-full h-full bg-[#DCE4E8]">
+    <div className="relative w-full h-full bg-[#EAE5DC]">
       <div ref={containerRef} className="w-full h-full" aria-label="3 Boyutlu Türkiye restoran haritası" />
 
       {/* Top Overlay: Neighborhood 3D Quick-Flight Bar + Map Engine Switcher */}

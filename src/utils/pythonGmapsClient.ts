@@ -224,3 +224,36 @@ export async function fetchQuickGoogleMapsThumb(venue: Venue): Promise<string | 
   }
   return null;
 }
+
+export async function fetchNearbyViaPythonGmaps(
+  lat: number,
+  lng: number,
+  city: string
+): Promise<Venue[]> {
+  try {
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => controller.abort(), 14000);
+    const params = new URLSearchParams({
+      lat: lat.toFixed(5),
+      lng: lng.toFixed(5),
+      city,
+      zoom: '15',
+    });
+    const res = await fetch(`${PY_BACKEND}/api/gmaps/nearby-venues?${params.toString()}`, {
+      signal: controller.signal,
+    });
+    window.clearTimeout(timer);
+    if (!res.ok) return [];
+    const data = (await res.json()) as { venues?: Array<Partial<Venue>> };
+    return (data.venues ?? [])
+      .filter((v): v is Venue => Boolean(v.id && v.name && typeof v.lat === 'number' && typeof v.lng === 'number'))
+      .map((v) => ({
+        ...v,
+        isLiveOsm: true,
+        gpsVerified: true,
+        sourcePlatform: 'Google',
+      }));
+  } catch {
+    return [];
+  }
+}

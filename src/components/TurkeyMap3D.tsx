@@ -339,6 +339,26 @@ function buildTadimVectorStyle(isNight: boolean): StyleSpecification {
           'text-halo-width': 2,
         },
       },
+      {
+        id: 'poi-food',
+        type: 'symbol',
+        source: 'carto-vector',
+        'source-layer': 'poi',
+        minzoom: 14.2,
+        filter: ['in', 'class', 'restaurant', 'cafe', 'fast_food', 'bakery', 'ice_cream', 'bar', 'pub', 'pastry', 'grocery', 'shop'],
+        layout: {
+          'text-field': ['coalesce', ['get', 'name:tr'], ['get', 'name'], ['get', 'name:latin']],
+          'text-font': ['Open Sans Bold', 'Noto Sans Regular'],
+          'text-size': 10,
+          'text-max-width': 10,
+          'text-optional': true,
+        },
+        paint: {
+          'text-color': isNight ? '#7DD3FC' : '#64748B',
+          'text-halo-color': isNight ? 'rgba(9,24,31,0.9)' : 'rgba(255,255,255,0.9)',
+          'text-halo-width': 1.4,
+        },
+      },
     ],
   };
 }
@@ -865,6 +885,19 @@ export function TurkeyMap3D({
       duration: 950,
       essential: true,
     });
+    if (city !== 'Tüm Türkiye') {
+      window.setTimeout(() => {
+        onFetchRef.current(
+          {
+            south: target.lat - 0.025,
+            north: target.lat + 0.025,
+            west: target.lng - 0.032,
+            east: target.lng + 0.032,
+          },
+          false
+        );
+      }, 400);
+    }
   }, [city]);
 
   // Smooth 3D focus when selecting a venue

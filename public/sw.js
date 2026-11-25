@@ -1,4 +1,4 @@
-const CACHE_NAME = 'tadimrotasi-v5.5';
+const CACHE_NAME = 'tadimrotasi-v5.6';
 
 self.addEventListener('install', () => {
   self.skipWaiting();

@@ -1,5 +1,6 @@
 import type { CityName, Venue, VenueCategory, VenueCity } from '../types';
 import { CITY_CENTERS, VENUE_CITIES } from '../data/venues';
+import { fetchNearbyViaPythonGmaps } from './pythonGmapsClient';
 
 export interface MapBoundsBox {
   south: number;
@@ -10,7 +11,29 @@ export interface MapBoundsBox {
 
 const OVERPASS_MIRRORS = [
   'https://overpass-api.de/api/interpreter',
+  'https://overpass.kumi.systems/api/interpreter',
 ];
+
+const FOOD_OSM_VALUES = new Set([
+  'restaurant',
+  'cafe',
+  'fast_food',
+  'bakery',
+  'pastry',
+  'confectionery',
+  'ice_cream',
+  'coffee',
+  'bar',
+  'pub',
+  'teahouse',
+  'biergarten',
+  'food_court',
+  'deli',
+  'chocolate',
+  'tea',
+  'nuts',
+  'spices',
+]);
 
 const fetchedCells = new Set<string>();
 
@@ -135,10 +158,7 @@ async function fetchPhotonFallback(
   cLng: number,
   fallbackCity: CityName
 ): Promise<Venue[]> {
-  const queries = [
-    `https://photon.komoot.io/api/?q=restoran&lat=${cLat.toFixed(4)}&lon=${cLng.toFixed(4)}&limit=30&osm_tag=amenity:restaurant`,
-    `https://photon.komoot.io/api/?q=cafe&lat=${cLat.toFixed(4)}&lon=${cLng.toFixed(4)}&limit=25&osm_tag=amenity:cafe`,
-  ];
+  const terms = ['restoran', 'kafe', 'kebap'];
 
   interface PhotonResp {
     features?: Array<{
@@ -150,6 +170,7 @@ async function fetchPhotonFallback(
         housenumber?: string;
         district?: string;
         city?: string;
+        osm_key?: string;
         osm_value?: string;
       };
     }>;
@@ -159,31 +180,38 @@ async function fetchPhotonFallback(
   const seen = new Set<string>();
 
   await Promise.all(
-    queries.map(async (url) => {
+    terms.map(async (term) => {
       try {
-        const res = await fetch(url);
+        const controller = new AbortController();
+        const t = window.setTimeout(() => controller.abort(), 4500);
+        const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(term)}&lat=${cLat.toFixed(4)}&lon=${cLng.toFixed(4)}&limit=25`;
+        const res = await fetch(url, { signal: controller.signal });
+        window.clearTimeout(t);
         if (!res.ok) return;
         const data = (await res.json()) as PhotonResp;
         for (const f of data.features ?? []) {
-          const name = f.properties?.name?.trim();
+          const p = f.properties;
+          const name = p?.name?.trim();
           const coords = f.geometry?.coordinates;
           if (!name || !coords) continue;
+          if (p?.osm_key !== 'amenity' && p?.osm_key !== 'shop') continue;
+          if (!p?.osm_value || !FOOD_OSM_VALUES.has(p.osm_value)) continue;
           const [lng, lat] = coords;
-          if (Math.abs(lat - cLat) > 0.12 || Math.abs(lng - cLng) > 0.16) continue;
+          if (Math.abs(lat - cLat) > 0.08 || Math.abs(lng - cLng) > 0.1) continue;
           const dedupe = name.toLocaleLowerCase('tr-TR');
           if (seen.has(dedupe)) continue;
           seen.add(dedupe);
 
           const city = guessNearestCity(lat, lng, fallbackCity);
-          const district = f.properties?.district || f.properties?.street || city;
-          const addr = [f.properties?.street, district, city].filter(Boolean).join(', ');
+          const district = p.district || p.street || city;
+          const addr = [p.street, district, city].filter(Boolean).join(', ');
 
           results.push({
-            id: `osm-ph-${f.properties?.osm_id ?? `${lat.toFixed(4)}-${lng.toFixed(4)}`}`,
+            id: `osm-ph-${p.osm_id ?? `${lat.toFixed(4)}-${lng.toFixed(4)}`}`,
             name,
             city,
             district,
-            category: mapOsmToCategory(f.properties?.osm_value, undefined, undefined, name),
+            category: mapOsmToCategory(p.osm_value, p.osm_value, undefined, name),
             priceTier: '₺₺',
             lat: Number(lat.toFixed(5)),
             lng: Number(lng.toFixed(5)),
@@ -203,41 +231,81 @@ async function fetchPhotonFallback(
   return results;
 }
 
-/**
- * Fetches REAL street-level restaurants, cafés, bakeries, patisseries, and eateries
- * (both nodes AND building polygons via `out center`) from OpenStreetMap Overpass mirrors
- * with automatic Photon Komoot geo-POI failover.
- */
-export async function fetchLiveOsmVenuesInBounds(
-  bounds: MapBoundsBox,
-  fallbackCity: CityName,
-  options?: { force?: boolean; limit?: number }
+async function fetchNominatimViewboxFallback(
+  qBounds: MapBoundsBox,
+  fallbackCity: CityName
 ): Promise<Venue[]> {
-  const latSpan = bounds.north - bounds.south;
-  const lngSpan = bounds.east - bounds.west;
+  const viewbox = `${qBounds.west.toFixed(4)},${qBounds.north.toFixed(4)},${qBounds.east.toFixed(4)},${qBounds.south.toFixed(4)}`;
+  const tags = ['restaurant', 'cafe', 'fast_food'];
+  const results: Venue[] = [];
+  const seen = new Set<string>();
 
-  const maxSpan = 0.09;
-  const cLat = (bounds.south + bounds.north) / 2;
-  const cLng = (bounds.west + bounds.east) / 2;
-
-  const qBounds: MapBoundsBox =
-    latSpan > maxSpan || lngSpan > maxSpan
-      ? {
-          south: cLat - maxSpan / 2,
-          north: cLat + maxSpan / 2,
-          west: cLng - maxSpan / 2,
-          east: cLng + maxSpan / 2,
+  await Promise.all(
+    tags.map(async (tag) => {
+      try {
+        const controller = new AbortController();
+        const t = window.setTimeout(() => controller.abort(), 3500);
+        const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
+          `[amenity=${tag}]`
+        )}&viewbox=${viewbox}&bounded=1&limit=35&addressdetails=1`;
+        const res = await fetch(url, {
+          headers: { Accept: 'application/json' },
+          signal: controller.signal,
+        });
+        window.clearTimeout(t);
+        if (!res.ok) return;
+        const rows = (await res.json()) as Array<{
+          place_id: number;
+          name?: string;
+          display_name: string;
+          type?: string;
+          lat: string;
+          lon: string;
+          address?: { road?: string; suburb?: string; town?: string; city_district?: string; county?: string };
+        }>;
+        for (const row of rows) {
+          const name = row.name?.trim() || row.display_name.split(',')[0]?.trim();
+          const lat = Number(row.lat);
+          const lng = Number(row.lon);
+          if (!name || !Number.isFinite(lat) || !Number.isFinite(lng)) continue;
+          const dedupe = name.toLocaleLowerCase('tr-TR');
+          if (seen.has(dedupe)) continue;
+          seen.add(dedupe);
+          const city = guessNearestCity(lat, lng, fallbackCity);
+          const addr = row.address ?? {};
+          const district = addr.suburb || addr.city_district || addr.town || addr.county || city;
+          results.push({
+            id: `osm-nom-${row.place_id}`,
+            name,
+            city,
+            district,
+            category: mapOsmToCategory(tag, undefined, undefined, name),
+            priceTier: '₺₺',
+            lat: Number(lat.toFixed(5)),
+            lng: Number(lng.toFixed(5)),
+            gpsVerified: true,
+            isLiveOsm: true,
+            address: [addr.road, district, city].filter(Boolean).join(', '),
+            signatureDish: `${district} · Canlı harita kaydı`,
+            sourcePlatform: 'OpenStreetMap',
+          });
         }
-      : bounds;
+      } catch {
+        // Ignore single tag failure
+      }
+    })
+  );
 
-  const key = cellKey(qBounds);
-  if (!options?.force && fetchedCells.has(key)) {
-    return [];
-  }
+  return results;
+}
 
-  const limit = options?.limit ?? 400;
+async function fetchOverpassFast(
+  qBounds: MapBoundsBox,
+  fallbackCity: CityName,
+  limit: number
+): Promise<Venue[] | null> {
   const bbox = `${qBounds.south.toFixed(5)},${qBounds.west.toFixed(5)},${qBounds.north.toFixed(5)},${qBounds.east.toFixed(5)}`;
-  const query = `[out:json][timeout:12];(nwr["amenity"~"^(restaurant|cafe|fast_food|bakery|ice_cream|pub|bar|food_court|teahouse|biergarten)$"]["name"](${bbox});nwr["shop"~"^(pastry|bakery|confectionery|coffee|deli|chocolate|tea|ice_cream|nuts|spices)$"]["name"](${bbox}););out center ${limit};`;
+  const query = `[out:json][timeout:6];(nwr["amenity"="restaurant"](${bbox});nwr["amenity"="cafe"](${bbox});nwr["amenity"="fast_food"](${bbox});nwr["amenity"="bakery"](${bbox});nwr["amenity"="ice_cream"](${bbox});nwr["amenity"="bar"](${bbox});nwr["amenity"="pub"](${bbox});nwr["shop"="bakery"](${bbox});nwr["shop"="pastry"](${bbox});nwr["shop"="confectionery"](${bbox});nwr["shop"="coffee"](${bbox}););out center ${limit};`;
 
   interface OverpassElement {
     id: number;
@@ -252,11 +320,10 @@ export async function fetchLiveOsmVenuesInBounds(
   }
 
   let json: OverpassResponse | null = null;
-
   for (const endpoint of OVERPASS_MIRRORS) {
     try {
       const controller = new AbortController();
-      const timeout = window.setTimeout(() => controller.abort(), 9000);
+      const timeout = window.setTimeout(() => controller.abort(), 4500);
       const res = await fetch(`${endpoint}?data=${encodeURIComponent(query)}`, {
         method: 'GET',
         headers: { Accept: 'application/json' },
@@ -271,18 +338,7 @@ export async function fetchLiveOsmVenuesInBounds(
       // Try next mirror
     }
   }
-
-  if (!json) {
-    // Seamless Photon Komoot geo-POI fallback so real restaurants always load
-    const fallbackVenues = await fetchPhotonFallback(cLat, cLng, fallbackCity);
-    if (fallbackVenues.length > 0) {
-      fetchedCells.add(key);
-      return fallbackVenues;
-    }
-    throw new Error('Canlı mekân servisi şu an yoğun, birkaç saniye sonra tekrar dene.');
-  }
-
-  fetchedCells.add(key);
+  if (!json) return null;
 
   const elements = json.elements ?? [];
   const seen = new Set<string>();
@@ -356,6 +412,73 @@ export async function fetchLiveOsmVenuesInBounds(
       sourcePlatform: 'OpenStreetMap',
     });
   }
-
   return results;
+}
+
+/**
+ * Fetches REAL street-level restaurants, cafés, bakeries, patisseries, and eateries
+ * in parallel from Google Maps (backend), OpenStreetMap Overpass, Photon Komoot, and Nominatim.
+ */
+export async function fetchLiveOsmVenuesInBounds(
+  bounds: MapBoundsBox,
+  fallbackCity: CityName,
+  options?: { force?: boolean; limit?: number }
+): Promise<Venue[]> {
+  const latSpan = bounds.north - bounds.south;
+  const lngSpan = bounds.east - bounds.west;
+
+  const maxSpan = 0.09;
+  const cLat = (bounds.south + bounds.north) / 2;
+  const cLng = (bounds.west + bounds.east) / 2;
+
+  const qBounds: MapBoundsBox =
+    latSpan > maxSpan || lngSpan > maxSpan
+      ? {
+          south: cLat - maxSpan / 2,
+          north: cLat + maxSpan / 2,
+          west: cLng - maxSpan / 2,
+          east: cLng + maxSpan / 2,
+        }
+      : bounds;
+
+  const key = cellKey(qBounds);
+  if (!options?.force && fetchedCells.has(key)) {
+    return [];
+  }
+
+  const limit = options?.limit ?? 400;
+  const cityHint = guessNearestCity(cLat, cLng, fallbackCity);
+
+  const [gmapsRes, overpassRes, photonRes, nomRes] = await Promise.allSettled([
+    fetchNearbyViaPythonGmaps(cLat, cLng, cityHint),
+    fetchOverpassFast(qBounds, fallbackCity, limit),
+    fetchPhotonFallback(cLat, cLng, fallbackCity),
+    fetchNominatimViewboxFallback(qBounds, fallbackCity),
+  ]);
+
+  const combined: Venue[] = [];
+  const seen = new Set<string>();
+  let anyResponded = false;
+
+  const pushAll = (list: Venue[] | null | undefined) => {
+    if (!list) return;
+    anyResponded = true;
+    for (const v of list) {
+      const k = `${v.name.toLocaleLowerCase('tr-TR')}_${v.lat.toFixed(3)}`;
+      if (seen.has(k)) continue;
+      seen.add(k);
+      combined.push(v);
+    }
+  };
+
+  if (gmapsRes.status === 'fulfilled' && gmapsRes.value.length > 0) pushAll(gmapsRes.value);
+  if (overpassRes.status === 'fulfilled' && overpassRes.value !== null) pushAll(overpassRes.value);
+  if (photonRes.status === 'fulfilled') pushAll(photonRes.value);
+  if (nomRes.status === 'fulfilled') pushAll(nomRes.value);
+
+  if (anyResponded || combined.length > 0) {
+    fetchedCells.add(key);
+  }
+
+  return combined;
 }

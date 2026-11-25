@@ -570,7 +570,7 @@ export default function App() {
         setLocating(false);
         const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
         setUserLoc(loc);
-        setNearbyKm(2);
+        setNearbyKm(5);
         setActiveTab('discover');
         setSelectedVenueId(null);
         let best: VenueCity = 'İstanbul';
@@ -585,7 +585,7 @@ export default function App() {
         }
         setActiveCity(best);
         void handleFetchLiveArea(
-          { south: loc.lat - 0.018, north: loc.lat + 0.018, west: loc.lng - 0.024, east: loc.lng + 0.024 },
+          { south: loc.lat - 0.03, north: loc.lat + 0.03, west: loc.lng - 0.038, east: loc.lng + 0.038 },
           true
         );
         setLiveOsmMsg('Etrafındaki restoranlar yükleniyor...');

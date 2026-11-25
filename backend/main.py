@@ -45,6 +45,7 @@ RUNTIME_STATE: dict[str, str] = {
 
 # In-memory cache for live Google Maps place media & visual reviews
 LIVE_GMAPS_CACHE: dict[str, dict[str, Any]] = {}
+NEARBY_GMAPS_CACHE: dict[str, list[dict[str, Any]]] = {}
 
 GMAPS_HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
@@ -762,3 +763,152 @@ async def gmaps_directions(
             raise HTTPException(status_code=502, detail=str(exc)) from exc
 
     return {"source": "osrm_fallback"}
+
+
+def _scrape_gmaps_nearby_sync(
+    lat: float, lng: float, city: str, zoom: int = 15
+) -> list[dict[str, Any]]:
+    import json as jsonlib
+
+    queries = [
+        "restoran lokanta kebap",
+        "kafe kahve pastane tatlı",
+        "döner fırın büfe pide",
+    ]
+    found: list[dict[str, Any]] = []
+    seen: set[tuple[str, float]] = set()
+
+    for q_str in queries:
+        url = (
+            f"https://www.google.com/maps/search/{urllib.parse.quote(q_str)}"
+            f"/@{lat:.5f},{lng:.5f},{zoom}z?hl=tr"
+        )
+        try:
+            html1 = urllib.request.urlopen(
+                urllib.request.Request(url, headers=GMAPS_HEADERS), timeout=8
+            ).read().decode("utf-8", "ignore")
+            preloads = re.findall(r'href="(/search\?tbm=map[^"]+)"', html1)
+            if not preloads:
+                continue
+            raw = urllib.request.urlopen(
+                urllib.request.Request(
+                    "https://www.google.com" + htmllib.unescape(preloads[0]),
+                    headers=GMAPS_HEADERS,
+                ),
+                timeout=8,
+            ).read().decode("utf-8", "ignore")
+            raw_json = raw.split("\n", 1)[1] if raw.startswith(")]}'") else raw
+            data = jsonlib.loads(raw_json)
+            d_str = data.get("d", "") if isinstance(data, dict) else ""
+            inner = jsonlib.loads(d_str.split("\n", 1)[1]) if d_str.startswith(")]}'") else data
+        except Exception:
+            continue
+
+        def walk(node: Any) -> None:
+            if isinstance(node, list):
+                if (
+                    len(node) > 14
+                    and isinstance(node[11], str)
+                    and isinstance(node[9], list)
+                    and len(node[9]) >= 4
+                    and isinstance(node[9][2], (int, float))
+                    and isinstance(node[9][3], (int, float))
+                ):
+                    plat, plng = float(node[9][2]), float(node[9][3])
+                    if not (35.5 <= plat <= 42.5 and 25.5 <= plng <= 45.0):
+                        return
+                    title = node[11].strip()
+                    key = (title.lower(), round(plat, 3))
+                    if key in seen:
+                        return
+                    seen.add(key)
+
+                    rating = (
+                        float(node[4][7])
+                        if isinstance(node[4], list)
+                        and len(node[4]) > 7
+                        and isinstance(node[4][7], (int, float))
+                        else None
+                    )
+                    rcount = (
+                        int(node[4][8])
+                        if isinstance(node[4], list)
+                        and len(node[4]) > 8
+                        and isinstance(node[4][8], (int, float))
+                        else None
+                    )
+                    cats = [
+                        c
+                        for c in (node[13] if isinstance(node[13], list) else [])
+                        if isinstance(c, str)
+                    ]
+                    addr = (
+                        node[18]
+                        if len(node) > 18 and isinstance(node[18], str)
+                        else (
+                            node[39]
+                            if len(node) > 39 and isinstance(node[39], str)
+                            else ""
+                        )
+                    )
+                    node_s = jsonlib.dumps(node, ensure_ascii=False)
+                    photos = [
+                        u + "=w800-h600-k-no"
+                        for u in re.findall(
+                            r"https://lh[0-9]\.googleusercontent\.com/(?:gps-cs-s|grass-cs|p)/[A-Za-z0-9_\-]+",
+                            node_s,
+                        )
+                        if "/a/" not in u and "/a-" not in u
+                    ]
+                    cat = _infer_turkish_category(" ".join([title, *cats]))
+                    district = city
+                    if addr:
+                        parts = [p.strip() for p in addr.split(",") if p.strip()]
+                        if len(parts) >= 3:
+                            district = parts[-2][:35]
+                    found.append(
+                        {
+                            "id": f"gm-live-{abs(hash((title.lower(), round(plat, 4), round(plng, 4)))) % 10**10}",
+                            "name": title,
+                            "city": city,
+                            "district": district,
+                            "category": cat,
+                            "priceTier": "₺₺₺"
+                            if cat == "Meyhane & Bistro"
+                            else ("₺" if cat == "Sokak Lezzeti" else "₺₺"),
+                            "lat": round(plat, 5),
+                            "lng": round(plng, 5),
+                            "gpsVerified": True,
+                            "address": addr or f"{district}, {city}",
+                            "googleRating": round(rating, 1) if rating else None,
+                            "googleReviewCount": rcount,
+                            "googlePhotos": photos[:3] if photos else None,
+                            "signatureDish": " · ".join(cats[:2])
+                            if cats
+                            else f"{district} · Google Haritalar kaydı",
+                        }
+                    )
+                    return
+                for item in node:
+                    walk(item)
+
+        walk(inner)
+
+    return found[:45]
+
+
+@app.get("/api/gmaps/nearby-venues")
+async def gmaps_nearby_venues(
+    lat: float = Query(...),
+    lng: float = Query(...),
+    city: str = Query(default="İstanbul"),
+    zoom: int = Query(default=15, ge=11, le=18),
+) -> dict[str, Any]:
+    cache_key = f"{round(lat, 2)}:{round(lng, 2)}:{city.lower()}"
+    if cache_key in NEARBY_GMAPS_CACHE:
+        cached = NEARBY_GMAPS_CACHE[cache_key]
+        return {"count": len(cached), "venues": cached}
+    venues = await asyncio.to_thread(_scrape_gmaps_nearby_sync, lat, lng, city, zoom)
+    if venues:
+        NEARBY_GMAPS_CACHE[cache_key] = venues
+    return {"count": len(venues), "venues": venues}

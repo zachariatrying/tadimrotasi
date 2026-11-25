@@ -18,11 +18,14 @@ import {
   List,
   Globe2,
   Star,
+  LocateFixed,
+  Sparkles,
 } from 'lucide-react';
 import type { User } from '@supabase/supabase-js';
 import type {
   CityName,
   FriendProfile,
+  VenueCity,
   SentimentTier,
   SharedListPayload,
   TadimState,
@@ -32,8 +35,10 @@ import type {
 import {
   CITY_CENTERS,
   CITY_TABS,
+  FEATURED_CITY_COUNT,
   INITIAL_VENUES,
   VENUE_CATEGORIES,
+  VENUE_CITIES,
 } from './data/venues';
 import { insertRankedVenue, recalculateScores, scoreColor } from './utils/elo';
 import { buildShareableListUrl, parseSharedListInput, readSharedListFromHash } from './utils/shareLink';
@@ -90,6 +95,20 @@ function loadState(): TadimState {
 }
 
 type RailTab = 'discover' | 'ranked' | 'want' | 'friends';
+
+function distKm(aLat: number, aLng: number, bLat: number, bLng: number): number {
+  const R = 6371;
+  const dLat = ((bLat - aLat) * Math.PI) / 180;
+  const dLng = ((bLng - aLng) * Math.PI) / 180;
+  const x =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((aLat * Math.PI) / 180) * Math.cos((bLat * Math.PI) / 180) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(x));
+}
+
+function fmtDist(km: number): string {
+  return km < 1 ? `${Math.round(km * 1000)} m` : `${km.toFixed(1)} km`;
+}
 
 function VenueThumb({ venue, size = 'md', liveThumb }: { venue: Venue; size?: 'md' | 'sm'; liveThumb?: string }) {
   const realUrl = venue.googlePhotos?.[0] || liveThumb || getCachedVenueThumb(venue) || '';
@@ -274,6 +293,9 @@ export default function App() {
   }, []);
 
   const [listLimit, setListLimit] = useState(200);
+  const [userLoc, setUserLoc] = useState<{ lat: number; lng: number } | null>(null);
+  const [nearbyKm, setNearbyKm] = useState<number | null>(null);
+  const [locating, setLocating] = useState(false);
 
   useEffect(() => {
     if (isSupabaseConfigured) {
@@ -303,15 +325,21 @@ export default function App() {
         v.district.toLocaleLowerCase('tr-TR').includes(q) ||
         v.city.toLocaleLowerCase('tr-TR').includes(q) ||
         v.signatureDish.toLocaleLowerCase('tr-TR').includes(q);
-      return cityOk && catOk && quickOk && searchOk;
+      const nearOk = !userLoc || !nearbyKm || distKm(userLoc.lat, userLoc.lng, v.lat, v.lng) <= nearbyKm;
+      return (nearbyKm ? true : cityOk) && catOk && quickOk && searchOk && nearOk;
     },
-    [activeCity, activeCategory, quickPick, searchTerm]
+    [activeCity, activeCategory, quickPick, searchTerm, userLoc, nearbyKm]
   );
 
-  const visibleVenues = useMemo(
-    () => state.venues.filter(matchesFilters),
-    [state.venues, matchesFilters]
-  );
+  const visibleVenues = useMemo(() => {
+    const list = state.venues.filter(matchesFilters);
+    if (userLoc && nearbyKm) {
+      list.sort(
+        (a, b) => distKm(userLoc.lat, userLoc.lng, a.lat, a.lng) - distKm(userLoc.lat, userLoc.lng, b.lat, b.lng)
+      );
+    }
+    return list;
+  }, [state.venues, matchesFilters, userLoc, nearbyKm]);
 
   // Staggered background thumbnail prefetcher (2 concurrent, 350ms pause)
   useEffect(() => {
@@ -361,6 +389,65 @@ export default function App() {
   }, [state.wantToGoIds, venueMap, matchesFilters]);
 
   const selectedVenue = selectedVenueId ? venueMap.get(selectedVenueId) ?? null : null;
+
+  // Personal recommendations: taste profile (your rankings) + matched friends + craving (search) + distance
+  const recommendations = useMemo(() => {
+    if (!userLoc) return [];
+    const catScore = new Map<string, { sum: number; n: number }>();
+    for (const r of state.ranked) {
+      const v = venueMap.get(r.venueId);
+      if (!v) continue;
+      const c = catScore.get(v.category) ?? { sum: 0, n: 0 };
+      c.sum += r.score;
+      c.n += 1;
+      catScore.set(v.category, c);
+    }
+    const friendScores = new Map<string, { name: string; score: number }>();
+    for (const f of allFriends) {
+      for (const r of f.ratings) {
+        const prev = friendScores.get(r.venueId);
+        if (!prev || r.score > prev.score) friendScores.set(r.venueId, { name: f.name.split(' ')[0], score: r.score });
+      }
+    }
+    const craving = searchTerm.trim().toLocaleLowerCase('tr-TR');
+    const radius = nearbyKm ?? 3;
+    return state.venues
+      .filter((v) => !rankMap.has(v.id) && !hiddenSet.has(v.id))
+      .map((v) => {
+        const d = distKm(userLoc.lat, userLoc.lng, v.lat, v.lng);
+        if (d > radius) return null;
+        const reasons: string[] = [fmtDist(d)];
+        let score = 3 - d; // closer is better
+        const cs = catScore.get(v.category);
+        if (cs) {
+          score += (cs.sum / cs.n - 5) * 0.6;
+          if (cs.sum / cs.n >= 7) reasons.push(`Sevdiğin tür: ${v.category}`);
+        }
+        const fr = friendScores.get(v.id);
+        if (fr) {
+          score += (fr.score - 6) * 0.8;
+          reasons.push(`${fr.name} ${fr.score.toFixed(1)} verdi`);
+        }
+        if (v.googleRating) score += (v.googleRating - 4) * 1.5;
+        if (craving.length >= 2) {
+          const hay = `${v.name} ${v.signatureDish} ${v.category} ${(v.cuisineTags ?? []).join(' ')}`.toLocaleLowerCase('tr-TR');
+          if (hay.includes(craving)) {
+            score += 4;
+            reasons.push(`“${searchTerm.trim()}” arıyorsun`);
+          } else {
+            score -= 2;
+          }
+        }
+        if (wantSet.has(v.id)) {
+          score += 1.5;
+          reasons.push('Gideceklerinde');
+        }
+        return { venue: v, score, reasons };
+      })
+      .filter((x): x is { venue: Venue; score: number; reasons: string[] } => Boolean(x))
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 6);
+  }, [userLoc, nearbyKm, state.ranked, state.venues, venueMap, rankMap, hiddenSet, allFriends, searchTerm, wantSet]);
 
   const handleSelectVenue = useCallback((id: string | null) => {
     setSelectedVenueId(id);
@@ -467,6 +554,49 @@ export default function App() {
     },
     [activeCity]
   );
+
+  const handleLocateNearby = () => {
+    if (!navigator.geolocation) {
+      setLiveOsmMsg('Tarayıcın konum özelliğini desteklemiyor');
+      return;
+    }
+    if (nearbyKm) {
+      setNearbyKm(null);
+      return;
+    }
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setLocating(false);
+        const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        setUserLoc(loc);
+        setNearbyKm(2);
+        setActiveTab('discover');
+        setSelectedVenueId(null);
+        let best: VenueCity = 'İstanbul';
+        let bestD = Infinity;
+        for (const c of VENUE_CITIES) {
+          const ctr = CITY_CENTERS[c];
+          const d = distKm(loc.lat, loc.lng, ctr.lat, ctr.lng);
+          if (d < bestD) {
+            bestD = d;
+            best = c;
+          }
+        }
+        setActiveCity(best);
+        void handleFetchLiveArea(
+          { south: loc.lat - 0.018, north: loc.lat + 0.018, west: loc.lng - 0.024, east: loc.lng + 0.024 },
+          true
+        );
+        setLiveOsmMsg('Etrafındaki restoranlar yükleniyor...');
+      },
+      () => {
+        setLocating(false);
+        setLiveOsmMsg('Konum izni verilmedi — tarayıcı ayarlarından izin verebilirsin');
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  };
 
   // Click any point on the map -> reverse geocode that exact POI and open it
   const handlePickPoint = useCallback(
@@ -934,13 +1064,36 @@ export default function App() {
       {/* Compact Filter Bar (12 Cities + Categories) */}
       <div className="shrink-0 bg-white/95 backdrop-blur border-b border-[#E4E8EB] px-3 sm:px-4 py-2 flex flex-wrap items-center gap-2 shadow-[0_1px_0_rgba(0,0,0,0.02)]">
         <div className="flex items-center gap-1 overflow-x-auto max-w-full" role="group" aria-label="Şehir seç">
-          {CITY_TABS.map((city) => (
+          <button
+            type="button"
+            onClick={handleLocateNearby}
+            className={`shrink-0 inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-bold transition-all cursor-pointer ${nearbyKm
+              ? 'bg-[#2563EB] text-white shadow-sm'
+              : 'bg-[#EFF6FF] text-[#1D4ED8] hover:bg-[#DBEAFE]'
+              }`}
+          >
+            <LocateFixed className={`w-3.5 h-3.5 ${locating ? 'animate-pulse' : ''}`} />
+            {locating ? 'Konum alınıyor…' : nearbyKm ? 'Yakınımda ✓' : 'Yakınımda'}
+          </button>
+          {nearbyKm && (
+            <select
+              value={nearbyKm}
+              onChange={(e) => setNearbyKm(Number(e.target.value))}
+              className="shrink-0 rounded-full border border-[#BFDBFE] bg-white px-2 py-1 text-xs font-semibold text-[#1D4ED8]"
+            >
+              {[0.5, 1, 2, 5, 10].map((km) => (
+                <option key={km} value={km}>{km < 1 ? '500 m' : `${km} km`}</option>
+              ))}
+            </select>
+          )}
+          {CITY_TABS.slice(0, FEATURED_CITY_COUNT).map((city) => (
             <button
               key={city}
               type="button"
               onClick={() => {
                 setActiveCity(city);
                 setSelectedVenueId(null);
+                setNearbyKm(null);
               }}
               className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold transition-all cursor-pointer ${activeCity === city
                 ? 'bg-[#0B4A4F] text-white shadow-sm'
@@ -950,6 +1103,24 @@ export default function App() {
               {city}
             </button>
           ))}
+          <select
+            value={CITY_TABS.indexOf(activeCity) >= FEATURED_CITY_COUNT ? activeCity : ''}
+            onChange={(e) => {
+              if (!e.target.value) return;
+              setActiveCity(e.target.value as CityName);
+              setSelectedVenueId(null);
+              setNearbyKm(null);
+            }}
+            className={`shrink-0 rounded-full border px-2.5 py-1 text-xs font-semibold cursor-pointer ${CITY_TABS.indexOf(activeCity) >= FEATURED_CITY_COUNT
+              ? 'border-[#0B4A4F] bg-[#0B4A4F] text-white'
+              : 'border-[#D1D5DB] bg-white text-[#374151]'
+              }`}
+          >
+            <option value="">+ Diğer {CITY_TABS.length - FEATURED_CITY_COUNT} il</option>
+            {CITY_TABS.slice(FEATURED_CITY_COUNT).map((c) => (
+              <option key={c} value={c}>{c}</option>
+            ))}
+          </select>
         </div>
 
         <span className="hidden sm:inline-block h-4 w-px bg-[#D1D5DB]" />
@@ -1090,6 +1261,39 @@ export default function App() {
                     </div>
                   ) : (
                     <>
+                      {recommendations.length > 0 && (
+                        <div className="px-3.5 py-3 bg-gradient-to-b from-[#EFF6FF] to-white border-b border-[#DBEAFE]">
+                          <div className="flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-wider text-[#1D4ED8] mb-2">
+                            <Sparkles className="w-3.5 h-3.5" />
+                            Yakınında Sana Önerilenler
+                            {searchTerm.trim().length >= 2 && <span className="normal-case font-semibold">· “{searchTerm.trim()}”</span>}
+                          </div>
+                          <div className="flex gap-2 overflow-x-auto pb-1">
+                            {recommendations.map(({ venue, reasons }) => (
+                              <button
+                                key={venue.id}
+                                type="button"
+                                onClick={() => setSelectedVenueId(venue.id)}
+                                className="shrink-0 w-44 text-left rounded-xl border border-[#DBEAFE] bg-white p-2.5 hover:border-[#2563EB] hover:shadow-md transition-all cursor-pointer"
+                              >
+                                <div className="flex items-center gap-2">
+                                  <VenueThumb venue={venue} size="sm" liveThumb={liveThumbs[venue.id]} />
+                                  <div className="min-w-0">
+                                    <div className="text-xs font-bold text-[#111827] truncate">{venue.name}</div>
+                                    <div className="text-[10px] text-[#64748B] truncate">{venue.category}</div>
+                                  </div>
+                                </div>
+                                <div className="mt-1.5 text-[10px] font-semibold text-[#1D4ED8] line-clamp-2">
+                                  {reasons.join(' · ')}
+                                </div>
+                              </button>
+                            ))}
+                          </div>
+                          <div className="mt-1 text-[10px] text-[#64748B]">
+                            Ne yemek istediğini yukarıdaki aramaya yaz (ör. “lahmacun”), öneriler ona göre değişir.
+                          </div>
+                        </div>
+                      )}
                       {searchTerm.trim().length >= 2 && (
                         <div className="px-3.5 py-2 bg-[#F0FDFA] border-b border-[#CCFBF1] flex items-center justify-between gap-2">
                           <span className="text-[11px] text-[#134E4A] truncate">
@@ -1132,6 +1336,7 @@ export default function App() {
                                   )}
                                 </div>
                                 <div className="text-xs text-[#6B7280] truncate mt-0.5">
+                                  {userLoc && nearbyKm ? `${fmtDist(distKm(userLoc.lat, userLoc.lng, venue.lat, venue.lng))} · ` : ''}
                                   {venue.district}, {venue.city} · {venue.category} · {venue.priceTier}
                                 </div>
                                 <div className="text-[11px] text-[#4B5563] truncate mt-0.5">
@@ -1390,6 +1595,7 @@ export default function App() {
             onClearRoute={() => setActiveRoute(null)}
             onFetchLiveArea={(bounds, force) => void handleFetchLiveArea(bounds, force)}
             onPickPoint={(lat, lng) => void handlePickPoint(lat, lng)}
+            userLocation={nearbyKm ? userLoc : null}
           />
         </main>
 

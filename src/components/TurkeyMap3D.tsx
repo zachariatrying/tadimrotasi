@@ -46,6 +46,7 @@ interface TurkeyMap3DProps {
   onClearRoute: () => void;
   onFetchLiveArea: (bounds: MapBoundsBox, force?: boolean) => void;
   onPickPoint?: (lat: number, lng: number) => void;
+  userLocation?: { lat: number; lng: number } | null;
 }
 
 type MapStyleMode = 'apple3d' | 'night3d' | 'googleStreet' | 'googleSat' | 'organicTopo';
@@ -328,6 +329,7 @@ export function TurkeyMap3D({
   onClearRoute,
   onFetchLiveArea,
   onPickPoint,
+  userLocation,
 }: TurkeyMap3DProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
@@ -738,6 +740,23 @@ export function TurkeyMap3D({
       });
     }
   }, [activeRoute, is3D]);
+
+  // User location blue dot + fly to it
+  const userMarkerRef = useRef<maplibregl.Marker | null>(null);
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    userMarkerRef.current?.remove();
+    userMarkerRef.current = null;
+    if (!userLocation) return;
+    const el = document.createElement('div');
+    el.style.cssText =
+      'width:18px;height:18px;border-radius:50%;background:#2563EB;border:3px solid #fff;box-shadow:0 0 0 8px rgba(37,99,235,0.22)';
+    userMarkerRef.current = new maplibregl.Marker({ element: el })
+      .setLngLat([userLocation.lng, userLocation.lat])
+      .addTo(map);
+    map.flyTo({ center: [userLocation.lng, userLocation.lat], zoom: 15.6, pitch: is3D ? 55 : 0, duration: 900 });
+  }, [userLocation]);
 
   const handleFlyHotspot = (spot: NeighborhoodHotspot) => {
     const map = mapRef.current;

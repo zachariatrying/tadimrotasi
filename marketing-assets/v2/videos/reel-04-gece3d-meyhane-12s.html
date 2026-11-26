@@ -1,0 +1,90 @@
+<!DOCTYPE html><html lang="tr"><head><meta charset="UTF-8" />
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{width:1080px;height:1920px;overflow:hidden;background:#091315;font-family:'Segoe UI',system-ui,sans-serif;color:#FFFFFF}
+    #stage{position:relative;width:1080px;height:1920px;overflow:hidden;background:radial-gradient(circle at 80% 18%, rgba(224,90,43,0.22), transparent 55%), #091315}
+    .topbar{position:absolute;top:0;left:0;right:0;height:14px;background:#E05A2B}
+    .eyebrow{position:absolute;top:86px;left:72px;font-family:Consolas,monospace;font-size:24px;font-weight:700;letter-spacing:0.14em;color:#FDBA74}
+    .hook-wrap{position:absolute;top:140px;left:72px;right:72px}
+    .hook{font-size:66px;font-weight:800;line-height:1.08}
+    .acc{color:#FB923C}
+    .sub{margin-top:18px;font-size:30px;line-height:1.38;color:#CBD5E1}
+    .mapbox{position:absolute;left:72px;right:72px;top:520px;height:1060px;border-radius:38px;overflow:hidden;border:4px solid #E05A2B;box-shadow:0 34px 80px rgba(0,0,0,0.5);background:#07292C}
+    .mapbox img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+    .badge{position:absolute;left:28px;top:28px;background:rgba(9,19,21,0.9);border:2px solid #FB923C;color:#fff;padding:14px 26px;border-radius:999px;font-size:24px;font-weight:700}
+    .card{position:absolute;right:96px;bottom:340px;width:540px;background:rgba(9,19,21,0.94);border:3px solid #FB923C;border-radius:28px;padding:24px 28px}
+    .ctag{font-family:Consolas,monospace;font-size:20px;font-weight:700;color:#FB923C}
+    .ctit{font-size:34px;font-weight:800;margin-top:6px}
+    .csub{font-size:23px;color:#CBD5E1;margin-top:6px}
+    .cta{position:absolute;left:72px;right:72px;bottom:80px;background:#0B4A4F;color:#fff;border-radius:30px;padding:26px 34px;display:flex;justify-content:space-between;align-items:center}
+    .cta-left{display:flex;align-items:center;gap:18px}
+    .cta-left img{width:68px;height:68px;border-radius:16px;object-fit:cover}
+    .cta-left h2{font-size:36px;font-weight:800}
+    .cta-left p{font-size:21px;font-family:Consolas,monospace;color:#D1FAE5;margin-top:4px}
+    .cta-btn{background:#E05A2B;color:#fff;padding:16px 28px;border-radius:999px;font-size:24px;font-weight:800}
+  </style></head>
+  <body>
+    <div id="stage">
+      <div class="topbar"></div>
+      <div id="eyebrow" class="eyebrow">TADIMROTASI · GECE 3D MEYHANE &amp; OCAKBAŞI</div>
+      <div id="hook" class="hook-wrap">
+        <div class="hook">Cuma gecesi <span class="acc">Gece 3D</span> haritada gerçek lezzet rotaları!</div>
+        <div class="sub">Gündüzden tek dokunuşla Gece 3D moduna geç, açık ocakbaşı ve meyhaneleri gör.</div>
+      </div>
+      <div id="mapbox" class="mapbox">
+        <img id="day" src="./assets/desktop-tadim3d-istanbul.png" alt="Tadım 3D" />
+        <img id="night" src="./assets/desktop-gece3d-istanbul.png" alt="Gece 3D" style="opacity:0" />
+        <div id="badge" class="badge">☀️ Tadım 3D · Gündüz</div>
+      </div>
+      <div id="card" class="card">
+        <div class="ctag">GECE 3D · ELO 9.3</div>
+        <div class="ctit">Asmalı Cavit · Beyoğlu</div>
+        <div class="csub">Meyhane &amp; Bistro · Arkadaşların %92 önerdi</div>
+      </div>
+      <div id="cta" class="cta">
+        <div class="cta-left">
+          <img src="./assets/tadimrotasi_icon.png" alt="Logo" />
+          <div><h2>TadımRotası Gece 3D</h2><p>zachariatrying.github.io/tadimrotasi</p></div>
+        </div>
+        <div class="cta-btn">Haritayı Aç →</div>
+      </div>
+    </div>
+    <script>
+      const clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
+      const easeOut = (t) => 1 - Math.pow(1 - clamp(t), 3);
+      const prog = (t, s, e) => easeOut((t - s) / (e - s));
+      window.__duration = 12.0;
+      window.__renderMode = window.__renderMode || false;
+      window.__timelines = {
+        main: {
+          seek(t) {
+            const pH = prog(t, 0, 0.7);
+            document.getElementById('eyebrow').style.opacity = pH;
+            const hk = document.getElementById('hook');
+            hk.style.opacity = pH; hk.style.transform = 'translateY(' + ((1 - pH) * 30) + 'px)';
+            const pM = prog(t, 1.0, 2.0);
+            const mb = document.getElementById('mapbox');
+            mb.style.opacity = pM; mb.style.transform = 'scale(' + (0.94 + 0.06 * pM) + ')';
+            const panX = -24 * Math.sin(clamp(t / 12) * Math.PI);
+            document.getElementById('day').style.transform = 'scale(1.08) translateX(' + panX + 'px)';
+            document.getElementById('night').style.transform = 'scale(1.08) translateX(' + panX + 'px)';
+            const pN = prog(t, 3.6, 4.8);
+            document.getElementById('night').style.opacity = pN;
+            document.getElementById('badge').textContent = pN > 0.5 ? '🌙 Gece 3D · Meyhane & Ocakbaşı' : '☀️ Tadım 3D · Gündüz';
+            const pC = prog(t, 5.6, 6.6);
+            const cd = document.getElementById('card');
+            cd.style.opacity = pC; cd.style.transform = 'translateX(' + ((1 - pC) * 70) + 'px)';
+            const pCta = prog(t, 8.6, 9.6);
+            const cta = document.getElementById('cta');
+            cta.style.opacity = pCta; cta.style.transform = 'translateY(' + ((1 - pCta) * 44) + 'px)';
+          }
+        }
+      };
+      window.__timelines.main.seek(0);
+      if (!navigator.webdriver && !window.__renderMode) {
+        const t0 = performance.now();
+        const loop = (now) => { if (!window.__renderMode) { window.__timelines.main.seek(((now - t0) / 1000) % 12); requestAnimationFrame(loop); } };
+        requestAnimationFrame(loop);
+      }
+    </script>
+  </body></html>

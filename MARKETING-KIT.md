@@ -14,8 +14,9 @@
 | **Şehir Story Posterleri (6 İl)** | `marketing-assets/v2/posters/poster-{istanbul,ankara,izmir,gaziantep,adana,kilis}.png` | `1080×1920` PNG (9:16) | IG Story (`y=1380..1570` Link/Konum çıkartma boşluğu) |
 | **Strateji Diyagramı 1** | `marketing-assets/v2/diagrams/tadim-quadrant.{html,svg,png}` | Vektör + `2×` PNG | Yatırımcı / Blog / LinkedIn konumlandırma |
 | **Strateji Diyagramı 2** | `marketing-assets/v2/diagrams/tadim-flywheel-loop.{html,svg,png}` | Vektör + `2×` PNG | Organik büyüme çarkı sunumu |
-| **Reels Video 1 (12 sn)** | `marketing-assets/v2/videos/reel-01-yakinimda-12s.mp4` | `1080×1920` H.264 30fps | IG Reels / TikTok / YouTube Shorts |
-| **Reels Video 2 (15 sn)** | `marketing-assets/v2/videos/reel-02-elo-vs-sahte-puan-15s.mp4` | `1080×1920` H.264 30fps | IG Reels / TikTok / Meta Ads Test |
+| **Reels Video 1 (12 sn)** | `marketing-assets/v2/videos/reel-01-yakinimda-12s.mp4` | `1080×1920` H.264 + AAC Ses | IG Reels / TikTok / YouTube Shorts |
+| **Reels Video 2 (15 sn)** | `marketing-assets/v2/videos/reel-02-elo-vs-sahte-puan-15s.mp4` | `1080×1920` H.264 + AAC Ses | IG Reels / TikTok / Meta Ads Test |
+| **Reels Video 3 (12 sn)** | `marketing-assets/v2/videos/reel-03-kayitli-mekanlar-12s.mp4` | `1080×1920` H.264 + AAC Ses | IG Reels / Kaydedilenler UGC Kancası |
 
 ---
 

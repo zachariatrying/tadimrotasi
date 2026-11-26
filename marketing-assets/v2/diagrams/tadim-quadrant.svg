@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg viewBox="0 0 1000 660" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="quadrant-consultant-title quadrant-consultant-desc" id="tadim-quadrant-root">
+        <title id="quadrant-consultant-title">TadımRotası Konumlandırma Matrisi</title>
+        <desc id="quadrant-consultant-desc">Reklamlı-Doğrulanmış ve Genel-Kişisel eksenlerinde dört mekân keşif modeli; sağ üstte TadımRotası odaklıdır.</desc>
+        <defs>
+      <style>@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&amp;family=Geist:wght@400;500;600&amp;family=Geist+Mono:wght@400;500;600&amp;family=Noto+Serif:ital@0;1&amp;family=Noto+Sans+KR:wght@400;500;600&amp;family=Noto+Serif+KR:wght@400&amp;family=Noto+Sans+TC:wght@400;500;600&amp;family=Noto+Serif+TC:wght@400&amp;display=swap');
+      #tadim-quadrant-root { --color-paper:   #f4f1ea;
+      --color-paper-2: #eae5da;
+      --color-ink:     #111827;
+      --color-muted:   #475569;
+      --color-soft:    #52606d;
+      --color-rule:    rgba(17,24,39,0.12);
+      --color-accent:  #0b4a4f;
+      --font-sans:     'Geist', system-ui, sans-serif;
+      --font-serif:    'Instrument Serif', serif;
+      --font-mono:     'Geist Mono', ui-monospace, monospace; }
+      #tadim-quadrant-root { font-family: var(--font-sans); color: var(--color-ink); }
+      #tadim-quadrant-root .container { max-width: 1200px; margin: 0 auto; }
+      #tadim-quadrant-root .header-eyebrow { font-family: var(--font-mono); font-size: 0.66rem; font-weight: 500; letter-spacing: 0.18em; text-transform: uppercase; color: var(--color-muted); margin-bottom: 0.75rem; }
+      #tadim-quadrant-root .subtitle { font-size: 1rem; line-height: 1.55; color: var(--color-muted); max-width: 58ch; }
+      #tadim-quadrant-root .diagram-container { background: transparent; border: none; padding: 0; overflow-x: auto; }
+      #tadim-quadrant-root .card-header { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.875rem; padding-bottom: 0.875rem; border-bottom: 1px solid rgba(17,24,39,0.08); }
+      #tadim-quadrant-root .card-dot { width: 7px; height: 7px; border-radius: 50%; }
+      #tadim-quadrant-root .card-dot.ink { background: var(--color-ink); }
+      #tadim-quadrant-root .card-dot.muted { background: var(--color-muted); }
+      #tadim-quadrant-root .card-dot.teal { background: var(--color-accent); }</style>
+          <marker id="tadim-quadrant-axis-end" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto">
+            <polygon points="0 0, 9 3.5, 0 7" fill="#111827"/>
+          </marker>
+          <marker id="tadim-quadrant-axis-start" markerWidth="9" markerHeight="7" refX="1" refY="3.5" orient="auto">
+            <polygon points="9 0, 0 3.5, 9 7" fill="#111827"/>
+          </marker>
+        </defs>
+
+        <rect width="100%" height="100%" fill="#f4f1ea"/>
+
+        <!-- Focal quadrant tint (TR) -->
+        <rect x="500" y="80" width="400" height="220" fill="#0b4a4f" fill-opacity="0.05"/>
+
+        <!-- TL -->
+        <rect x="140" y="120" width="300" height="160" rx="6" fill="#111827" stroke="#475569" stroke-width="1" fill-opacity="0.04" stroke-opacity="0.28"/>
+        <text x="156" y="144" fill="#475569" font-size="8" font-weight="500" font-family="'Geist Mono', monospace" letter-spacing="0.14em">01 · DOĞRULANMIŞ / GENEL</text>
+        <text x="156" y="180" fill="#111827" font-size="16" font-weight="600" font-family="'Geist', sans-serif">Editöryel rehberler</text>
+        <text x="156" y="216" fill="#475569" font-size="11" font-family="'Geist', sans-serif">Statik gurme listeleri;</text>
+        <text x="156" y="232" fill="#475569" font-size="11" font-family="'Geist', sans-serif">güvenilir ama senin damak</text>
+        <text x="156" y="248" fill="#475569" font-size="11" font-family="'Geist', sans-serif">tadını hiç bilmez.</text>
+
+        <!-- TR (FOCAL) -->
+        <rect x="560" y="120" width="300" height="160" rx="6" fill="#0b4a4f" stroke="#0b4a4f" stroke-width="1.2" fill-opacity="0.08"/>
+        <text x="576" y="144" fill="#0b4a4f" font-size="8" font-weight="600" font-family="'Geist Mono', monospace" letter-spacing="0.14em">02 · DOĞRULANMIŞ / KİŞİSEL</text>
+        <text x="576" y="180" fill="#111827" font-size="16" font-weight="600" font-family="'Geist', sans-serif">TadımRotası <tspan fill="#0b4a4f" font-size="13">●</tspan></text>
+        <text x="576" y="216" fill="#475569" font-size="11" font-family="'Geist', sans-serif">İkili Elo sıralama, gerçek</text>
+        <text x="576" y="232" fill="#475569" font-size="11" font-family="'Geist', sans-serif">3D harita ve arkadaşlarınla</text>
+        <text x="576" y="248" fill="#475569" font-size="11" font-family="'Geist', sans-serif">anlık damak uyumu.</text>
+
+        <!-- BL -->
+        <rect x="140" y="320" width="300" height="160" rx="6" fill="#111827" stroke="#475569" stroke-width="1" fill-opacity="0.04" stroke-opacity="0.28"/>
+        <text x="156" y="344" fill="#475569" font-size="8" font-weight="500" font-family="'Geist Mono', monospace" letter-spacing="0.14em">03 · REKLAMLI / GENEL</text>
+        <text x="156" y="380" fill="#111827" font-size="16" font-weight="600" font-family="'Geist', sans-serif">Puan çöplüğü</text>
+        <text x="156" y="416" fill="#475569" font-size="11" font-family="'Geist', sans-serif">İkram karşılığı 5 yıldız,</text>
+        <text x="156" y="432" fill="#475569" font-size="11" font-family="'Geist', sans-serif">bot yorumlar ve her yerin</text>
+        <text x="156" y="448" fill="#475569" font-size="11" font-family="'Geist', sans-serif">4.8 çıktığı haritalar.</text>
+
+        <!-- BR -->
+        <rect x="560" y="320" width="300" height="160" rx="6" fill="#111827" stroke="#475569" stroke-width="1" fill-opacity="0.04" stroke-opacity="0.28"/>
+        <text x="576" y="344" fill="#475569" font-size="8" font-weight="500" font-family="'Geist Mono', monospace" letter-spacing="0.14em">04 · REKLAMLI / KİŞİSEL</text>
+        <text x="576" y="380" fill="#111827" font-size="16" font-weight="600" font-family="'Geist', sans-serif">Algoritmik akışlar</text>
+        <text x="576" y="416" fill="#475569" font-size="11" font-family="'Geist', sans-serif">Reels'te kaydedip bir daha</text>
+        <text x="576" y="432" fill="#475569" font-size="11" font-family="'Geist', sans-serif">asla bulamadığın sponsorlu</text>
+        <text x="576" y="448" fill="#475569" font-size="11" font-family="'Geist', sans-serif">mekân videoları.</text>
+
+        <!-- Axis cross -->
+        <line x1="200" y1="300" x2="800" y2="300"
+              stroke="#111827" stroke-width="1.2"
+              marker-start="url(#tadim-quadrant-axis-start)" marker-end="url(#tadim-quadrant-axis-end)"/>
+        <line x1="500" y1="60" x2="500" y2="540"
+              stroke="#111827" stroke-width="1.2"
+              marker-start="url(#tadim-quadrant-axis-start)" marker-end="url(#tadim-quadrant-axis-end)"/>
+
+        <!-- Axis labels -->
+        <text x="500" y="48" fill="#111827" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.18em">DOĞRULANMIŞ</text>
+        <text x="500" y="560" fill="#111827" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.18em">REKLAMLI</text>
+        <text x="188" y="300" fill="#111827" font-size="9" font-family="'Geist Mono', monospace" text-anchor="end" dominant-baseline="middle" letter-spacing="0.18em">GENEL</text>
+        <text x="812" y="300" fill="#111827" font-size="9" font-family="'Geist Mono', monospace" text-anchor="start" dominant-baseline="middle" letter-spacing="0.18em">KİŞİSEL</text>
+
+        <!-- Legend -->
+        <line x1="40" y1="604" x2="960" y2="604" stroke="#111827" stroke-width="0.8" stroke-opacity="0.10"/>
+        <rect x="40" y="616" width="16" height="16" rx="3" fill="#0b4a4f" stroke="#0b4a4f" stroke-width="1" fill-opacity="0.08"/>
+        <text x="64" y="628" fill="#475569" font-size="8.5" font-family="'Geist', sans-serif">TadımRotası Konumu</text>
+        <rect x="200" y="616" width="16" height="16" rx="3" fill="#111827" stroke="#475569" stroke-width="1" fill-opacity="0.04" stroke-opacity="0.28"/>
+        <text x="224" y="628" fill="#475569" font-size="8.5" font-family="'Geist', sans-serif">Alternatif Yaklaşımlar</text>
+        <text x="364" y="628" fill="#475569" font-size="8.5" font-family="'Geist', sans-serif" font-style="italic">Puan satışı yok. Güven ve kişisel damak zevki aynı karede.</text>
+      </svg>

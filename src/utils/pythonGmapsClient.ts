@@ -1,4 +1,4 @@
-﻿import type { GoogleVisualReview, Venue } from '../types';
+import type { GoogleVisualReview, Venue } from '../types';
 
 export interface PythonGmapsInspection {
   engine: string;

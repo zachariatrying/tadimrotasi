@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { GuideWidget } from './components/GuideWidget';
 import {
   Plus,
   Bookmark,
@@ -1670,6 +1671,8 @@ export default function App() {
         onImportJson={(imported) => setState(imported)}
         onDeleteAllData={handleDeleteAllData}
       />
+
+      <GuideWidget />
     </div>
   );
 }

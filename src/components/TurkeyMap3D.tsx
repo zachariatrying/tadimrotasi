@@ -1284,7 +1284,7 @@ export function TurkeyMap3D({
       )}
 
       {/* Bottom-Right: Apple Maps-Style 3D / Orbit / Zoom / GPS Control Stack */}
-      <div className="absolute bottom-20 lg:bottom-6 right-3 z-[20] flex flex-col items-end gap-2">
+      <div className="absolute bottom-20 lg:bottom-16 right-3 z-[20] flex flex-col items-end gap-2">
         <button
           type="button"
           onClick={handleToggle3D}

@@ -1,4 +1,4 @@
-import type { GoogleVisualReview, Venue } from '../types';
+﻿import type { GoogleVisualReview, Venue } from '../types';
 
 export interface PythonGmapsInspection {
   engine: string;
@@ -30,7 +30,7 @@ export interface PythonGmapsInspection {
   embed_streetview_url: string;
 }
 
-const PY_BACKEND: string = import.meta.env.VITE_PY_BACKEND || 'http://127.0.0.1:8005';
+const PY_BACKEND: string = ((import.meta.env.VITE_PY_BACKEND as string | undefined) || '').trim();
 const KEY_STORAGE = 'tr_google_maps_api_key';
 
 export function getSavedGoogleMapsKey(): string {
@@ -48,6 +48,7 @@ export async function saveGoogleMapsKeyToPython(apiKey: string): Promise<boolean
   } else {
     localStorage.removeItem(KEY_STORAGE);
   }
+  if (!PY_BACKEND) return false;
   try {
     const res = await fetch(`${PY_BACKEND}/api/gmaps/configure-key`, {
       method: 'POST',
@@ -66,7 +67,7 @@ export async function inspectVenueViaPythonGmaps(venue: Venue): Promise<PythonGm
   const defaultEmbedCoord = `https://maps.google.com/maps?q=${venue.lat.toFixed(5)},${venue.lng.toFixed(5)}&t=k&hl=tr&z=19&output=embed`;
   const defaultStreetView = `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${venue.lat.toFixed(5)},${venue.lng.toFixed(5)}`;
 
-  try {
+  if (PY_BACKEND) try {
     const controller = new AbortController();
     const timer = window.setTimeout(() => controller.abort(), 45000);
     const key = getSavedGoogleMapsKey();
@@ -112,6 +113,7 @@ export async function inspectVenueViaPythonGmaps(venue: Venue): Promise<PythonGm
 
 /** Wake the Render free-tier backend as soon as the app opens (cold start ~50s). */
 export function wakePythonBackend(): void {
+  if (!PY_BACKEND) return;
   void fetch(`${PY_BACKEND}/api/gmaps/status`).catch(() => {});
 }
 
@@ -129,6 +131,7 @@ function loadThumbCache(): Record<string, string> {
 
 function saveThumbToCache(venueId: string, url: string) {
   thumbMemoryCache.set(venueId, url);
+  if (!PY_BACKEND) return false;
   try {
     const existing = loadThumbCache();
     existing[venueId] = url;
@@ -158,7 +161,7 @@ export interface ScrapeGraphVenueResult {
   city: string;
   district: string;
   category: string;
-  priceTier: '₺' | '₺₺' | '₺₺₺';
+  priceTier: 'â‚º' | 'â‚ºâ‚º' | 'â‚ºâ‚ºâ‚º';
   signatureDish: string;
   lat: number;
   lng: number;
@@ -174,6 +177,7 @@ export async function extractVenueViaScrapeGraph(
   defaultCity: string,
   prompt?: string
 ): Promise<ScrapeGraphVenueResult | null> {
+  if (!PY_BACKEND) return null;
   try {
     const res = await fetch(`${PY_BACKEND}/api/scrapegraph/extract-venue`, {
       method: 'POST',
@@ -183,7 +187,7 @@ export async function extractVenueViaScrapeGraph(
         default_city: defaultCity,
         prompt:
           prompt ||
-          'Mekân adı, şehir, semt, kategori, imza yemek, fiyat bandı, koordinat ve fotoğrafları çıkar',
+          'MekÃ¢n adÄ±, ÅŸehir, semt, kategori, imza yemek, fiyat bandÄ±, koordinat ve fotoÄŸraflarÄ± Ã§Ä±kar',
       }),
     });
     if (!res.ok) return null;
@@ -199,7 +203,7 @@ const MAX_CONCURRENT_THUMBS = 2;
 export async function fetchQuickGoogleMapsThumb(venue: Venue): Promise<string | null> {
   const existing = getCachedVenueThumb(venue);
   if (existing) return existing;
-  if (activeThumbRequests >= MAX_CONCURRENT_THUMBS) return null;
+  if (!PY_BACKEND || activeThumbRequests >= MAX_CONCURRENT_THUMBS) return null;
 
   activeThumbRequests += 1;
   try {
@@ -230,6 +234,7 @@ export async function fetchNearbyViaPythonGmaps(
   lng: number,
   city: string
 ): Promise<Venue[]> {
+  if (!PY_BACKEND) return [];
   try {
     const controller = new AbortController();
     const timer = window.setTimeout(() => controller.abort(), 14000);
